@@ -288,70 +288,75 @@ function getLogoUrl(retailerName) {
   return null;
 }
 
-const LOGO_SIZE = 52; // Uniform height for all logo markers
-const WIDE_LOGO_W = 90; // wider container for landscape logos
+const LOGO_H = 48; // Fixed height for all logo markers
+const LOGO_MIN_W = 48; // Minimum width (square)
+const LOGO_MAX_W = 110; // Maximum width (very wide logos)
 
-// Logos with aspect ratio > 2.2:1 — computed from actual image files
-const WIDE_LOGOS = new Set([
-  'ATI.png', 'ATT.png', 'Aladdins.png', 'American Freight.png', 'Audia.png',
-  'Bealls Outlet.png', 'Candlewood Suites.png', 'Dunhams Sports.png', 'Dunkin.png',
-  'Duquesne University.png', 'Emilianos Wide.png', 'Emilianos.png', 'Ensinger.png',
-  'Fairmont Supply.png', 'Family Dollar Dollar Tree.png', 'Freshens.jpg', 'Gabes.png',
-  'Hilton Garden Inn.png', 'Hobby Lobby.png', 'Jenis Ice Cream.png', 'Mad Mex.png',
-  'Marshalls.png', 'Maxines.png', 'Moonlit Burgers.png', 'NAPA Auto Parts.png',
-  'OReilly Auto Parts.png', 'Ollies.png', 'Pizza Milano White.png', 'PolyOne.png',
-  'Precision Marshall.png', 'Primanti Bros.png', 'SMS Group.png', 'Saga Hibachi.png',
-  'Sakura Japanese Steakhouse.png', 'Salems.png', 'Sheetz.png', 'Staybridge Suites.png',
-  'Subway.png', 'TJ Maxx.png', 'Tepache.png', 'Tim Hortons.png',
-  'Tractor Supply Company.png', 'Walgreens.png', 'Wingate by Wyndham.png',
-]);
+// Cache of logo natural dimensions: url → { w, h, aspect }
+const logoDimCache = {};
 
-function isWideLogo(logoUrl) {
-  const filename = logoUrl.split('/').pop();
-  return WIDE_LOGOS.has(filename);
+function preloadLogo(url) {
+  if (logoDimCache[url]) return Promise.resolve(logoDimCache[url]);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const aspect = img.naturalWidth / img.naturalHeight;
+      logoDimCache[url] = { w: img.naturalWidth, h: img.naturalHeight, aspect };
+      resolve(logoDimCache[url]);
+    };
+    img.onerror = () => {
+      logoDimCache[url] = { w: 1, h: 1, aspect: 1 };
+      resolve(logoDimCache[url]);
+    };
+    img.src = url;
+  });
+}
+
+// Get marker width for a logo based on its natural aspect ratio
+function getLogoMarkerW(logoUrl) {
+  const cached = logoDimCache[logoUrl];
+  if (!cached) return LOGO_MIN_W;
+  // Scale width to maintain aspect ratio at fixed height
+  const innerH = LOGO_H - 14; // padding + border overhead
+  const naturalW = innerH * cached.aspect + 14; // add back padding + border
+  return Math.max(LOGO_MIN_W, Math.min(LOGO_MAX_W, Math.round(naturalW)));
 }
 
 function createLogoIcon(logoUrl) {
-  const isWide = isWideLogo(logoUrl);
-  const markerW = isWide ? WIDE_LOGO_W : LOGO_SIZE;
+  const markerW = getLogoMarkerW(logoUrl);
 
   return L.divIcon({
-    html: `<div class="logo-marker${isWide ? ' logo-wide' : ''}"><img src="${logoUrl}" alt="" /></div>`,
+    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" /></div>`,
     className: '',
-    iconSize: [markerW, LOGO_SIZE],
-    iconAnchor: [markerW / 2, LOGO_SIZE / 2],
-    popupAnchor: [0, -LOGO_SIZE / 2],
+    iconSize: [markerW, LOGO_H],
+    iconAnchor: [markerW / 2, LOGO_H / 2],
+    popupAnchor: [0, -LOGO_H / 2],
   });
 }
 
 // Create a callout-style logo icon with speech-bubble tail pointing toward centroid
 function createCalloutLogoIcon(logoUrl, pointerDir) {
-  const isWide = isWideLogo(logoUrl);
-  const markerW = isWide ? WIDE_LOGO_W : LOGO_SIZE;
+  const markerW = getLogoMarkerW(logoUrl);
   const tailH = CALLOUT_TAIL;
 
-  const tailSvg = getCalloutTailSvg(pointerDir, markerW, LOGO_SIZE, tailH);
+  const boxLeft = pointerDir === 'left' ? tailH : 0;
+  const boxTop = pointerDir === 'top' ? tailH : 0;
+  const tailSvg = getCalloutTailSvg(pointerDir, markerW, LOGO_H, tailH, boxLeft, boxTop);
 
-  // Extra space for the tail
   const extraW = (pointerDir === 'left' || pointerDir === 'right') ? tailH : 0;
   const extraH = (pointerDir === 'top' || pointerDir === 'bottom') ? tailH : 0;
   const totalW = markerW + extraW;
-  const totalH = LOGO_SIZE + extraH;
-
-  // Position the box within the larger container
-  const boxLeft = pointerDir === 'left' ? tailH : 0;
-  const boxTop = pointerDir === 'top' ? tailH : 0;
+  const totalH = LOGO_H + extraH;
 
   const html = `<div class="callout-wrap" style="width:${totalW}px;height:${totalH}px;position:relative;">
-    <div class="logo-marker${isWide ? ' logo-wide' : ''}" style="position:absolute;left:${boxLeft}px;top:${boxTop}px;">
+    <div class="logo-marker" style="position:absolute;left:${boxLeft}px;top:${boxTop}px;width:${markerW}px;height:${LOGO_H}px;">
       <img src="${logoUrl}" alt="" />
     </div>
     ${tailSvg}
   </div>`;
 
-  // Anchor at center of the box (not the tail)
   const anchorX = boxLeft + markerW / 2;
-  const anchorY = boxTop + LOGO_SIZE / 2;
+  const anchorY = boxTop + LOGO_H / 2;
 
   return L.divIcon({
     html,
@@ -373,38 +378,45 @@ function getPointerDirection(fromX, fromY, toX, toY) {
 }
 
 // Generate SVG tail for callout bubble pointing in given direction
-function getCalloutTailSvg(dir, boxW, boxH, tailLen) {
-  const tailW = 16; // width of triangle base
+// boxLeft/boxTop = offset of the box within the callout-wrap container
+function getCalloutTailSvg(dir, boxW, boxH, tailLen, boxLeft, boxTop) {
+  boxLeft = boxLeft || 0;
+  boxTop = boxTop || 0;
+  const tailW = 18; // width of triangle base
   const borderColor = '#888888';
   const fillColor = '#ffffff';
   const sw = 2; // stroke width
 
   if (dir === 'bottom') {
-    const cx = boxW / 2;
-    return `<svg style="position:absolute;left:${cx - tailW / 2}px;top:${boxH - 1}px;" width="${tailW}" height="${tailLen}" viewBox="0 0 ${tailW} ${tailLen}" fill="none">
-      <polygon points="0,0 ${tailW},0 ${tailW / 2},${tailLen}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
-      <rect x="0" y="0" width="${tailW}" height="${sw + 1}" fill="${fillColor}"/>
+    const left = boxLeft + boxW / 2 - tailW / 2;
+    const top = boxTop + boxH - 1;
+    return `<svg style="position:absolute;left:${left}px;top:${top}px;" width="${tailW}" height="${tailLen}" viewBox="0 0 ${tailW} ${tailLen}" fill="none">
+      <polygon points="1,0 ${tailW - 1},0 ${tailW / 2},${tailLen - 1}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
+      <rect x="1" y="0" width="${tailW - 2}" height="${sw + 1}" fill="${fillColor}"/>
     </svg>`;
   }
   if (dir === 'top') {
-    const cx = boxW / 2;
-    return `<svg style="position:absolute;left:${cx - tailW / 2}px;top:${-tailLen + 1}px;" width="${tailW}" height="${tailLen}" viewBox="0 0 ${tailW} ${tailLen}" fill="none">
-      <polygon points="0,${tailLen} ${tailW},${tailLen} ${tailW / 2},0" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
-      <rect x="0" y="${tailLen - sw - 1}" width="${tailW}" height="${sw + 1}" fill="${fillColor}"/>
+    const left = boxLeft + boxW / 2 - tailW / 2;
+    const top = boxTop - tailLen + 1;
+    return `<svg style="position:absolute;left:${left}px;top:${top}px;" width="${tailW}" height="${tailLen}" viewBox="0 0 ${tailW} ${tailLen}" fill="none">
+      <polygon points="1,${tailLen} ${tailW - 1},${tailLen} ${tailW / 2},1" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
+      <rect x="1" y="${tailLen - sw - 1}" width="${tailW - 2}" height="${sw + 1}" fill="${fillColor}"/>
     </svg>`;
   }
   if (dir === 'right') {
-    const cy = boxH / 2;
-    return `<svg style="position:absolute;left:${boxW - 1}px;top:${cy - tailW / 2}px;" width="${tailLen}" height="${tailW}" viewBox="0 0 ${tailLen} ${tailW}" fill="none">
-      <polygon points="0,0 0,${tailW} ${tailLen},${tailW / 2}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
-      <rect x="0" y="0" width="${sw + 1}" height="${tailW}" fill="${fillColor}"/>
+    const left = boxLeft + boxW - 1;
+    const top = boxTop + boxH / 2 - tailW / 2;
+    return `<svg style="position:absolute;left:${left}px;top:${top}px;" width="${tailLen}" height="${tailW}" viewBox="0 0 ${tailLen} ${tailW}" fill="none">
+      <polygon points="0,1 0,${tailW - 1} ${tailLen - 1},${tailW / 2}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
+      <rect x="0" y="1" width="${sw + 1}" height="${tailW - 2}" fill="${fillColor}"/>
     </svg>`;
   }
   // left
-  const cy = boxH / 2;
-  return `<svg style="position:absolute;left:${-tailLen + 1}px;top:${cy - tailW / 2}px;" width="${tailLen}" height="${tailW}" viewBox="0 0 ${tailLen} ${tailW}" fill="none">
-    <polygon points="${tailLen},0 ${tailLen},${tailW} 0,${tailW / 2}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
-    <rect x="${tailLen - sw - 1}" y="0" width="${sw + 1}" height="${tailW}" fill="${fillColor}"/>
+  const left = boxLeft - tailLen + 1;
+  const top = boxTop + boxH / 2 - tailW / 2;
+  return `<svg style="position:absolute;left:${left}px;top:${top}px;" width="${tailLen}" height="${tailW}" viewBox="0 0 ${tailLen} ${tailW}" fill="none">
+    <polygon points="${tailLen},1 ${tailLen},${tailW - 1} 1,${tailW / 2}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
+    <rect x="${tailLen - sw - 1}" y="1" width="${sw + 1}" height="${tailW - 2}" fill="${fillColor}"/>
   </svg>`;
 }
 
@@ -441,8 +453,8 @@ function buildClusters(map, items) {
   // Convert to pixel positions with bounding box sizes
   const nodes = items.map((item, i) => {
     const pt = map.latLngToContainerPoint(item.position);
-    const w = (item.wide ? WIDE_LOGO_W : LOGO_SIZE) + MARKER_PAD;
-    const h = LOGO_SIZE + MARKER_PAD;
+    const w = (item.markerW || LOGO_MIN_W) + MARKER_PAD;
+    const h = LOGO_H + MARKER_PAD;
     return { ...item, px: pt.x, py: pt.y, w, h, clusterId: i };
   });
 
@@ -564,13 +576,13 @@ function createClusterGridIcon(cluster, childrenData, pointerDir) {
 
   // Wrap in callout with speech-bubble tail
   const tailH = CALLOUT_TAIL;
-  const tailSvg = getCalloutTailSvg(pointerDir, gridW, gridH, tailH);
   const extraW = (pointerDir === 'left' || pointerDir === 'right') ? tailH : 0;
   const extraH = (pointerDir === 'top' || pointerDir === 'bottom') ? tailH : 0;
   const totalW = gridW + extraW;
   const totalH = gridH + extraH;
   const boxLeft = pointerDir === 'left' ? tailH : 0;
   const boxTop = pointerDir === 'top' ? tailH : 0;
+  const tailSvg = getCalloutTailSvg(pointerDir, gridW, gridH, tailH, boxLeft, boxTop);
 
   const html = `<div class="callout-wrap" style="width:${totalW}px;height:${totalH}px;position:relative;">
     <div class="smart-cluster" style="position:absolute;left:${boxLeft}px;top:${boxTop}px;width:${gridW}px;height:${gridH}px;grid-template-columns:repeat(${cols},${CLUSTER_CELL}px);">${cells}<div class="sc-count">${items.length}</div></div>
@@ -728,7 +740,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       // Build item list
       const items = children.map((child) => ({
         position: L.latLng(child.position[0], child.position[1]),
-        wide: child.icon?.options?.iconSize?.[0] > LOGO_SIZE,
+        markerW: child.icon?.options?.iconSize?.[0] || LOGO_MIN_W,
         idx: child.idx,
       }));
 
@@ -1089,6 +1101,12 @@ export default function App() {
       if (parsed.retailers.length === 0) {
         throw new Error('No retailers found within the search radius. Try increasing the radius.');
       }
+
+      // Preload all logo images so we know their dimensions for dynamic sizing
+      const logoUrls = parsed.retailers
+        .map((r) => getLogoUrl(r.name))
+        .filter(Boolean);
+      await Promise.all(logoUrls.map(preloadLogo));
 
       setData(parsed);
 

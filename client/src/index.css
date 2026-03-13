@@ -644,7 +644,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
   padding: 5px;
   cursor: grab;
 }
@@ -657,18 +657,9 @@ body {
   pointer-events: none;
 }
 
-.callout-wrap {
-  overflow: visible;
-}
-
-.callout-wrap * {
-  pointer-events: none;
-}
-
 /* Let touch events pass through to Leaflet's drag handler */
 .logo-marker,
-.smart-cluster,
-.callout-wrap {
+.smart-cluster {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -715,7 +706,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
   border: 1px solid #e0ddd8;
 }
 

@@ -637,23 +637,23 @@ body {
 
 /* ---- Logo Markers ---- */
 .logo-marker {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 8px;
   background: #ffffff !important;
-  border: 2px solid #c9a84c;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  border: 2px solid #888888;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 3px;
+  padding: 5px;
   cursor: grab;
 }
 
 .logo-marker.logo-wide {
-  width: 80px;
-  padding: 5px;
+  width: 90px;
+  padding: 6px;
 }
 
 .logo-marker img {
@@ -664,9 +664,18 @@ body {
   pointer-events: none;
 }
 
+.callout-wrap {
+  overflow: visible;
+}
+
+.callout-wrap * {
+  pointer-events: none;
+}
+
 /* Let touch events pass through to Leaflet's drag handler */
 .logo-marker,
-.smart-cluster {
+.smart-cluster,
+.callout-wrap {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -693,24 +702,23 @@ body {
   gap: 3px;
   padding: 6px;
   background: #ffffff !important;
-  border: 2px solid #c9a84c;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  border: 2px solid #888888;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
   position: relative;
   cursor: grab;
-  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .smart-cluster:hover {
-  border-color: #b8952e;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  border-color: #666666;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
 .sc-cell {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   background: #ffffff !important;
-  border-radius: 5px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -719,8 +727,8 @@ body {
 }
 
 .sc-cell img {
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
   display: block;
 }
@@ -739,7 +747,7 @@ body {
   height: 20px;
   padding: 0 5px;
   border-radius: 10px;
-  background: var(--gold);
+  background: #555555;
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -748,8 +756,9 @@ body {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   border: 1.5px solid #fff;
+  pointer-events: auto;
 }
 
 /* ---- Connecting lines (rendered via L.canvas — no CSS needed) ---- */

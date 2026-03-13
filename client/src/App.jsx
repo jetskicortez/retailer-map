@@ -988,22 +988,78 @@ export default function App() {
     });
   }
 
-  // Export map as high-res PNG
-  const handleExportImage = useCallback(async () => {
-    if (!mapPanelRef.current) return;
-    // Hide controls during capture
-    const controls = mapPanelRef.current.querySelectorAll('.map-controls, .leaflet-control-zoom, .leaflet-control-attribution');
-    controls.forEach((el) => (el.style.display = 'none'));
+  // ── Shared export helper: capture map at 8.5×11 landscape ────────
+  // Standard letter landscape: 11in × 8.5in  →  aspect ratio 11:8.5
+  const EXPORT_W = 11 * 300; // 3300px at 300 DPI
+  const EXPORT_H = 8.5 * 300; // 2550px at 300 DPI
+
+  const captureMapForExport = useCallback(async () => {
+    if (!mapPanelRef.current) return null;
+
+    // Hide ALL UI controls / overlays so only the map + markers show
+    const hideSelectors = [
+      '.map-controls',
+      '.leaflet-control-zoom',
+      '.leaflet-control-attribution',
+      '.loading-bar',
+      '.mobile-export-bar',
+      '.mobile-menu-btn',
+    ].join(', ');
+    const hidden = mapPanelRef.current.querySelectorAll(hideSelectors);
+    // Also hide any elements outside mapPanelRef that overlap (mobile menu btn)
+    const globalHidden = document.querySelectorAll('.mobile-menu-btn, .sidebar-overlay');
+    hidden.forEach((el) => (el.style.display = 'none'));
+    globalHidden.forEach((el) => (el.style.display = 'none'));
+
     const fixed = fixObjectFitForExport(mapPanelRef.current);
     try {
-      const canvas = await html2canvas(mapPanelRef.current, {
-        scale: 3, // 3x for high-res print quality
+      // Capture at high resolution
+      const rawCanvas = await html2canvas(mapPanelRef.current, {
+        scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
       });
+
+      // Resize / crop to exact 8.5×11 landscape (cover-fit)
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = EXPORT_W;
+      outCanvas.height = EXPORT_H;
+      const ctx = outCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
+
+      const srcRatio = rawCanvas.width / rawCanvas.height;
+      const dstRatio = EXPORT_W / EXPORT_H;
+      let sx, sy, sw, sh;
+      if (srcRatio > dstRatio) {
+        // source is wider — crop sides
+        sh = rawCanvas.height;
+        sw = rawCanvas.height * dstRatio;
+        sx = (rawCanvas.width - sw) / 2;
+        sy = 0;
+      } else {
+        // source is taller — crop top/bottom
+        sw = rawCanvas.width;
+        sh = rawCanvas.width / dstRatio;
+        sx = 0;
+        sy = (rawCanvas.height - sh) / 2;
+      }
+      ctx.drawImage(rawCanvas, sx, sy, sw, sh, 0, 0, EXPORT_W, EXPORT_H);
+
+      return outCanvas;
+    } finally {
       restoreObjectFit(fixed);
-      controls.forEach((el) => (el.style.display = ''));
+      hidden.forEach((el) => (el.style.display = ''));
+      globalHidden.forEach((el) => (el.style.display = ''));
+    }
+  }, []);
+
+  // Export map as high-res PNG (8.5×11 landscape)
+  const handleExportImage = useCallback(async () => {
+    try {
+      const canvas = await captureMapForExport();
+      if (!canvas) return;
       const link = document.createElement('a');
       const slug = data?.property?.display
         ?.replace(/[^a-zA-Z0-9]+/g, '_')
@@ -1013,57 +1069,30 @@ export default function App() {
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (err) {
-      restoreObjectFit(fixed);
-      controls.forEach((el) => (el.style.display = ''));
       console.error('Export error:', err);
     }
-  }, [data]);
+  }, [data, captureMapForExport]);
 
-  // Export map as PDF (landscape, full page)
+  // Export map as PDF (8.5×11 landscape, full-bleed)
   const handleExportPDF = useCallback(async () => {
-    if (!mapPanelRef.current) return;
-    const controls = mapPanelRef.current.querySelectorAll('.map-controls, .leaflet-control-zoom, .leaflet-control-attribution');
-    controls.forEach((el) => (el.style.display = 'none'));
-    const fixed = fixObjectFitForExport(mapPanelRef.current);
     try {
-      const canvas = await html2canvas(mapPanelRef.current, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-      });
-      restoreObjectFit(fixed);
-      controls.forEach((el) => (el.style.display = ''));
+      const canvas = await captureMapForExport();
+      if (!canvas) return;
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgRatio = canvas.width / canvas.height;
-      const pageRatio = pageW / pageH;
-      let drawW, drawH, drawX, drawY;
-      if (imgRatio > pageRatio) {
-        drawW = pageW;
-        drawH = pageW / imgRatio;
-        drawX = 0;
-        drawY = (pageH - drawH) / 2;
-      } else {
-        drawH = pageH;
-        drawW = pageH * imgRatio;
-        drawX = (pageW - drawW) / 2;
-        drawY = 0;
-      }
-      pdf.addImage(imgData, 'PNG', drawX, drawY, drawW, drawH);
+      const pageW = pdf.internal.pageSize.getWidth();  // 11
+      const pageH = pdf.internal.pageSize.getHeight(); // 8.5
+      // Image is already exactly 11:8.5 so it fills the page edge-to-edge
+      pdf.addImage(imgData, 'PNG', 0, 0, pageW, pageH);
       const slug = data?.property?.display
         ?.replace(/[^a-zA-Z0-9]+/g, '_')
         ?.replace(/^_|_$/g, '')
         ?.substring(0, 40) || 'retailer_map';
       pdf.save(`${slug}_map.pdf`);
     } catch (err) {
-      restoreObjectFit(fixed);
-      controls.forEach((el) => (el.style.display = ''));
       console.error('PDF export error:', err);
     }
-  }, [data]);
+  }, [data, captureMapForExport]);
 
   return (
     <div className="app">

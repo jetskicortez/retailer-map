@@ -1105,9 +1105,8 @@ export default function App() {
         ?.replace(/[^a-zA-Z0-9]+/g, '_')
         ?.replace(/^_|_$/g, '')
         ?.substring(0, 40) || 'retailer_map';
+      const filename = `${slug}_map.png`;
 
-      // Use toBlob + createObjectURL — much more reliable than toDataURL
-      // on mobile where large data URIs can silently fail or get truncated
       const blob = await new Promise((resolve) =>
         canvas.toBlob(resolve, 'image/png')
       );
@@ -1115,14 +1114,27 @@ export default function App() {
         console.error('Failed to create PNG blob');
         return;
       }
+
+      // On mobile, try the native share sheet (best UX for saving images)
+      if (navigator.share && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+        try {
+          const file = new File([blob], filename, { type: 'image/png' });
+          await navigator.share({ files: [file] });
+          return;
+        } catch (shareErr) {
+          // User cancelled share or share not supported for files — fall through
+          if (shareErr.name === 'AbortError') return;
+        }
+      }
+
+      // Desktop / fallback: standard download via blob URL
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.download = `${slug}_map.png`;
+      link.download = filename;
       link.href = url;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      // Revoke after a short delay to ensure download starts
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (err) {
       console.error('Export error:', err);

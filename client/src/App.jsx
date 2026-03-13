@@ -528,8 +528,12 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
   }));
 
   // Subject property rect (pinned, never moves)
+  // The icon anchor is at [70, 76] (bottom-center), so the marker extends
+  // 76px upward from the lat/lng point. Offset the rect center accordingly.
   const propPt = map.latLngToContainerPoint(propertyLatLng);
-  const propRect = { x: propPt.x, y: propPt.y, w: 140 + MARKER_PAD, h: 76 + MARKER_PAD };
+  const propW = 140 + MARKER_PAD * 2;
+  const propH = 76 + MARKER_PAD * 2;
+  const propRect = { x: propPt.x, y: propPt.y - propH / 2, w: propW, h: propH };
 
   for (let iter = 0; iter < 60; iter++) {
     let moved = false;

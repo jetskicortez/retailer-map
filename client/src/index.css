@@ -640,14 +640,15 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 8px;
-  background: #ffffff;
+  background: #ffffff !important;
   border: 2px solid #c9a84c;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   padding: 3px;
+  cursor: grab;
 }
 
 .logo-marker.logo-wide {
@@ -662,17 +663,27 @@ body {
   display: block;
 }
 
+/* ---- Override Leaflet div-icon defaults ---- */
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-dragging .leaflet-marker-icon {
+  cursor: grabbing !important;
+}
+
 /* ---- Smart Cluster Grid Icons ---- */
 .smart-cluster {
   display: grid;
   gap: 3px;
   padding: 6px;
-  background: #ffffff;
+  background: #ffffff !important;
   border: 2px solid #c9a84c;
   border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
   position: relative;
-  cursor: pointer;
+  cursor: grab;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -684,13 +695,13 @@ body {
 .sc-cell {
   width: 32px;
   height: 32px;
-  background: #f5f5f5;
+  background: #ffffff !important;
   border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid #e8e8e8;
+  border: 1px solid #e0ddd8;
 }
 
 .sc-cell img {

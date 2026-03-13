@@ -575,6 +575,11 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
+  // Store user drag overrides: key → [lat, lng]
+  // Key is "s-{idx}" for singles, "c-{sorted idx list}" for clusters
+  const dragOverrides = useRef({});
+  // Track whether a drag just finished to suppress the moveend re-render
+  const justDragged = useRef(false);
 
   useEffect(() => {
     const layers = L.layerGroup().addTo(map);
@@ -591,6 +596,11 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
     const layers = layerGroupRef.current;
     const lines = linesGroupRef.current;
     if (!layers || !lines) return;
+
+    function getClusterKey(cluster) {
+      if (cluster.type === 'single') return `s-${cluster.items[0].idx}`;
+      return `c-${cluster.items.map((i) => i.idx).sort((a, b) => a - b).join(',')}`;
+    }
 
     function render() {
       layers.clearLayers();
@@ -619,23 +629,44 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const dp = displaced[ci];
         if (!dp) return;
 
+        const clusterKey = getClusterKey(cluster);
+        // Use drag override position if user has repositioned this marker
+        const overridePos = dragOverrides.current[clusterKey];
+        const markerLatLng = overridePos || dp.displacedLatLng;
+
         if (cluster.type === 'single') {
-          // Render single marker at displaced position
+          // Render single marker at displaced (or overridden) position
           const item = cluster.items[0];
           const child = children.find((c) => c && c.idx === item.idx);
           if (!child) return;
 
-          const marker = L.marker(dp.displacedLatLng, { icon: child.icon });
+          const marker = L.marker(markerLatLng, {
+            icon: child.icon,
+            draggable: true,
+          });
           if (child.popup) marker.bindPopup(child.popup);
           marker.on('click', () => {
             if (onMarkerClick) onMarkerClick(item.idx);
           });
+          marker.on('dragstart', () => {
+            justDragged.current = true;
+          });
+          marker.on('dragend', (e) => {
+            const pos = e.target.getLatLng();
+            dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
+            // Re-draw connecting lines after drag
+            justDragged.current = true;
+            render();
+          });
           if (markerRefs) markerRefs.current[`r-${item.idx}`] = marker;
           layers.addLayer(marker);
         } else {
-          // Render cluster icon at displaced position
+          // Render cluster icon at displaced (or overridden) position
           const icon = createClusterGridIcon(cluster, children);
-          const marker = L.marker(dp.displacedLatLng, { icon });
+          const marker = L.marker(markerLatLng, {
+            icon,
+            draggable: true,
+          });
 
           // Build cluster popup listing all retailers
           const names = cluster.items.map((item) => {
@@ -654,6 +685,15 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
               onMarkerClick(cluster.items[0].idx);
             }
           });
+          marker.on('dragstart', () => {
+            justDragged.current = true;
+          });
+          marker.on('dragend', (e) => {
+            const pos = e.target.getLatLng();
+            dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
+            justDragged.current = true;
+            render();
+          });
 
           // Store ref for all items in this cluster
           cluster.items.forEach((item) => {
@@ -662,10 +702,16 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           layers.addLayer(marker);
         }
 
-        // Draw connecting line if displaced
-        if (dp.wasDisplaced) {
+        // Draw connecting line from marker back to true centroid
+        const finalLatLng = overridePos || dp.displacedLatLng;
+        const origLatLng = cluster.centroidLatLng;
+        const finalPt = map.latLngToContainerPoint(finalLatLng);
+        const origPt = map.latLngToContainerPoint(origLatLng);
+        const lineDist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
+
+        if (lineDist > 3) {
           const line = L.polyline(
-            [dp.displacedLatLng, cluster.centroidLatLng],
+            [finalLatLng, origLatLng],
             {
               weight: 1.5,
               color: '#8a9aaa',
@@ -678,7 +724,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           lines.addLayer(line);
 
           // Anchor dot at real centroid
-          const anchor = L.circleMarker(cluster.centroidLatLng, {
+          const anchor = L.circleMarker(origLatLng, {
             radius: 3,
             fillColor: '#8a9aaa',
             fillOpacity: 0.5,
@@ -696,16 +742,30 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
     // Debounced re-render on zoom/pan to avoid excessive recalculation
     let timer = null;
     const debouncedRender = () => {
+      // Skip re-render if it was triggered by a drag (marker already repositioned)
+      if (justDragged.current) {
+        justDragged.current = false;
+        return;
+      }
       if (timer) clearTimeout(timer);
-      timer = setTimeout(render, 120);
+      // On zoom change, clear drag overrides since pixel positions shift
+      timer = setTimeout(() => {
+        render();
+      }, 120);
     };
 
-    map.on('zoomend', debouncedRender);
+    const onZoom = () => {
+      // Clear drag overrides on zoom since cluster composition may change
+      dragOverrides.current = {};
+      debouncedRender();
+    };
+
+    map.on('zoomend', onZoom);
     map.on('moveend', debouncedRender);
 
     return () => {
       if (timer) clearTimeout(timer);
-      map.off('zoomend', debouncedRender);
+      map.off('zoomend', onZoom);
       map.off('moveend', debouncedRender);
     };
   }, [children, onMarkerClick, markerRefs, propertyLatLng, map]);

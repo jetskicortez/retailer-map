@@ -766,6 +766,7 @@ export default function App() {
   const [activeCategories, setActiveCategories] = useState(new Set());
   const [activeChainSizes, setActiveChainSizes] = useState(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const markerRefs = useRef({});
   const cardRefs = useRef({});
@@ -1066,8 +1067,22 @@ export default function App() {
 
   return (
     <div className="app">
+      {/* ─── Mobile hamburger ─── */}
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setSidebarOpen((v) => !v)}
+        aria-label="Toggle sidebar"
+      >
+        {sidebarOpen ? '\u2715' : '\u2630'}
+      </button>
+
+      {/* ─── Mobile overlay ─── */}
+      {sidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* ─── Sidebar ─── */}
-      <aside className="sidebar">
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="sidebar-header">
           <div className="brand-name">The Colony Agency</div>
           <div className="brand-subtitle">Retailer Map Generator</div>
@@ -1355,6 +1370,15 @@ export default function App() {
           <div className="loading-bar">
             <div className="spinner" />
             <div className="loading-text">{loadingStatus || 'Generating retailer map\u2026'}</div>
+          </div>
+        )}
+
+        {/* Mobile export bar */}
+        {data && (
+          <div className="mobile-export-bar">
+            <button className="btn-export primary" onClick={handleExportImage}>PNG</button>
+            <button className="btn-export primary" onClick={handleExportPDF}>PDF</button>
+            <button className="btn-export" onClick={() => exportCSV(data.property, data.retailers)}>CSV</button>
           </div>
         )}
       </div>

@@ -1492,6 +1492,7 @@ export default function App() {
           zoom={12}
           style={{ width: '100%', height: '100%' }}
           ref={mapRef}
+          tap={false}
         >
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"

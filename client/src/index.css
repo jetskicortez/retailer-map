@@ -661,6 +661,20 @@ body {
   max-height: 100%;
   object-fit: contain;
   display: block;
+  pointer-events: none;
+}
+
+/* Let touch events pass through to Leaflet's drag handler */
+.logo-marker,
+.smart-cluster {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.logo-marker *,
+.smart-cluster * {
+  pointer-events: none;
 }
 
 /* ---- Override Leaflet div-icon defaults ---- */

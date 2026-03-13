@@ -134,7 +134,29 @@
       "Bash(curl -sL --max-time 10 -o \"Citizens-iconhorse.png\" \"https://icon.horse/icon/citizensbank.com\")",
       "Bash(curl -sL --max-time 10 -o \"CVS-ddd.png\" \"https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/CVS_Health_logo_2014.svg/200px-CVS_Health_logo_2014.svg.png\")",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(gh auth:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth status)",
+      "Bash(\"/c/Program Files \\(x86\\)/GitHub CLI/gh.exe\" auth status)",
+      "Bash(cmd.exe /c \"gh auth status\")",
+      "Bash(cmd.exe /c \"gh repo create retailer-map --public --source=. --remote=origin --push --description \"\"Retailer Map Generator for The Colony Agency commercial real estate\"\"\")",
+      "Bash(cmd.exe /c \"gh repo view jetskicortez/retailer-map --json url,name 2>&1\")",
+      "Bash(powershell.exe -NoProfile -Command \"gh repo create retailer-map --public --source=. --remote=origin --push --description ''Retailer Map Generator for The Colony Agency commercial real estate''\")",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo create retailer-map --public --source=. --remote=origin --push --description ''Retailer Map Generator for The Colony Agency commercial real estate''\")",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo view --json url --jq ''.url''\")",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' branch delete main-empty --remote --yes\")",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo edit --default-branch main\")",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' pr create --base main --head master --title ''Add README docs and settings updates'' --body-file pr-body.md\")",
+      "Bash(powershell.exe -NoProfile -Command \"Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess\")",
+      "Bash(curl -s -X POST http://localhost:3001/api/geocode -H \"Content-Type: application/json\" -d '{\"\"address\"\": \"\"533 Depot St, Latrobe, PA\"\"}')",
+      "Bash(curl -s -X POST http://localhost:3001/api/claude -H \"Content-Type: application/json\" -d '{\"\"model\"\":\"\"claude-sonnet-4-20250514\"\",\"\"max_tokens\"\":10,\"\"messages\"\":[{\"\"role\"\":\"\"user\"\",\"\"content\"\":\"\"Say ok\"\"}]}')",
+      "Bash(node -e \"require\\(''dotenv''\\).config\\(\\); const k = process.env.ANTHROPIC_API_KEY; console.log\\(''Key starts with:'', k?.substring\\(0,7\\), ''| Length:'', k?.length\\)\")",
+      "Bash(node -e \"require\\(''dotenv''\\).config\\({path:''.env''}\\); const k = process.env.ANTHROPIC_API_KEY; console.log\\(''Key starts with:'', k?.substring\\(0,7\\), ''| Length:'', k?.length\\); const g = process.env.GOOGLE_MAPS_API_KEY; console.log\\(''Google starts with:'', g?.substring\\(0,7\\), ''| Length:'', g?.length\\)\")",
+      "Bash(curl -s -X POST http://localhost:3001/api/places-nearby -H \"Content-Type: application/json\" -d '{\"\"lat\"\":40.3200131,\"\"lng\"\":-79.3803399,\"\"radiusMiles\"\":2,\"\"propertyAddress\"\":\"\"533 Depot St, Latrobe, PA\"\"}' -o /tmp/places-test.json)",
+      "Bash(node -e \"const j=JSON.parse\\(require\\(''fs''\\).readFileSync\\(''C:/Users/Jetsk/AppData/Local/Temp/places-test.json'',''utf8''\\)\\); console.log\\(''Property:'', j.property?.display\\); console.log\\(''Retailers found:'', j.retailers?.length\\); if\\(j.retailers?.length\\) { console.log\\(''First 5:''\\); j.retailers.slice\\(0,5\\).forEach\\(r => console.log\\(''  -'', r.name, ''\\(''+r.category+'','', r.distance_miles.toFixed\\(2\\)+''mi\\)''\\)\\); }\")"
     ]
   }
 }

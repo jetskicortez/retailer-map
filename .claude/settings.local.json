@@ -144,7 +144,12 @@
       "Bash(cmd.exe /c \"gh repo view jetskicortez/retailer-map --json url,name 2>&1\")",
       "Bash(powershell.exe -NoProfile -Command \"gh repo create retailer-map --public --source=. --remote=origin --push --description ''Retailer Map Generator for The Colony Agency commercial real estate''\")",
       "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo create retailer-map --public --source=. --remote=origin --push --description ''Retailer Map Generator for The Colony Agency commercial real estate''\")",
-      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo view --json url --jq ''.url''\")"
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo view --json url --jq ''.url''\")",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' branch delete main-empty --remote --yes\")",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo edit --default-branch main\")",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' pr create --base main --head master --title ''Add README docs and settings updates'' --body-file pr-body.md\")"
     ]
   }
 }

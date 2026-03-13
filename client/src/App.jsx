@@ -1,0 +1,1363 @@
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMap,
+} from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+// markercluster removed — using custom displacement layer instead
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+
+// ── Category config ──────────────────────────────────────────────
+const CATEGORIES = {
+  Grocery:          { color: '#4CAF50', emoji: '\u{1F6D2}' },
+  Pharmacy:         { color: '#f44336', emoji: '\u{1F48A}' },
+  'Fast Food':      { color: '#FF9800', emoji: '\u{1F354}' },
+  'Casual Dining':  { color: '#FFD600', emoji: '\u{1F37D}' },
+  Coffee:           { color: '#795548', emoji: '\u2615' },
+  Fitness:          { color: '#9C27B0', emoji: '\u{1F4AA}' },
+  'Home Improvement': { color: '#8D6E63', emoji: '\u{1F528}' },
+  Banking:          { color: '#2196F3', emoji: '\u{1F3E6}' },
+  Auto:             { color: '#607D8B', emoji: '\u{1F697}' },
+  Entertainment:    { color: '#E91E63', emoji: '\u{1F3AC}' },
+  'Department Store': { color: '#00BCD4', emoji: '\u{1F6CD}' },
+  'Discount/Value': { color: '#FF5722', emoji: '\u{1F3F7}' },
+  Pet:              { color: '#4DB6AC', emoji: '\u{1F43E}' },
+  'Cellular/Tech':  { color: '#5C6BC0', emoji: '\u{1F4F1}' },
+  Convenience:      { color: '#FFA726', emoji: '\u26FD' },
+  Other:            { color: '#78909C', emoji: '\u{1F4CD}' },
+};
+
+function getCategoryConfig(category) {
+  if (CATEGORIES[category]) return CATEGORIES[category];
+  for (const key of Object.keys(CATEGORIES)) {
+    if (category?.toLowerCase().includes(key.toLowerCase())) return CATEGORIES[key];
+  }
+  return CATEGORIES.Other;
+}
+
+// ── SVG icon builders ────────────────────────────────────────────
+function createPropertyIcon() {
+  const html = `<div class="property-marker">
+    <div class="property-pulse"></div>
+    <div class="property-label">SUBJECT PROPERTY</div>
+    <div class="property-pin">
+      <svg width="36" height="46" viewBox="0 0 36 46" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="pinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#e2c47a"/>
+            <stop offset="100%" stop-color="#c9a84c"/>
+          </linearGradient>
+          <filter id="pinShadow" x="-20%" y="-10%" width="140%" height="130%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.45"/>
+          </filter>
+        </defs>
+        <path d="M18 43C18 43 34 27 34 16C34 8 27 2 18 2C9 2 2 8 2 16C2 27 18 43 18 43Z"
+              fill="url(#pinGrad)" stroke="#0f1923" stroke-width="2" filter="url(#pinShadow)"/>
+        <circle cx="18" cy="16" r="7" fill="#0f1923"/>
+        <polygon points="18,11 19.5,14.5 23,14.8 20.3,17 21.1,20.5 18,18.7 14.9,20.5 15.7,17 13,14.8 16.5,14.5"
+                 fill="#c9a84c"/>
+      </svg>
+    </div>
+  </div>`;
+  // Total height: ~30px label + 46px pin = 76px; width driven by label (~140px)
+  return L.divIcon({
+    html,
+    className: '',
+    iconSize: [140, 76],
+    iconAnchor: [70, 76],
+    popupAnchor: [0, -76],
+  });
+}
+
+function createRetailerIcon(category) {
+  const cfg = getCategoryConfig(category);
+  const svg = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 35C14 35 27 22 27 13C27 6 21 1 14 1C7 1 1 6 1 13C1 22 14 35 14 35Z"
+          fill="${cfg.color}" stroke="#0f1923" stroke-width="1.5"/>
+    <circle cx="14" cy="13" r="9" fill="#0f1923" opacity="0.35"/>
+    <text x="14" y="17" text-anchor="middle" font-size="12">${cfg.emoji}</text>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [28, 36],
+    iconAnchor: [14, 36],
+    popupAnchor: [0, -36],
+  });
+}
+
+// ── Logo-based marker icons ──────────────────────────────────────
+// Map of normalized retailer names → logo filenames in /logos/
+const LOGO_FILES = {
+  'att': 'ATT.png',
+  'at&t': 'ATT.png',
+  'aarons': 'Aarons.png',
+  "aaron's": 'Aarons.png',
+  'anytime fitness': 'Anytime Fitness.png',
+  "arby's": 'Arbys.png',
+  'arbys': 'Arbys.png',
+  'bp': 'BP.png',
+  'barnes & noble': 'Barnes and Noble.png',
+  'barnes and noble': 'Barnes and Noble.png',
+  'big lots': 'Big Lots.png',
+  'bob evans': 'Bob Evans.png',
+  'bob evans restaurant': 'Bob Evans.png',
+  'buffalo wild wings': 'Buffalo Wild Wings.png',
+  'burger king': 'Burger King.png',
+  'chase': 'Chase Bank.png',
+  'chase bank': 'Chase Bank.png',
+  'jpmorgan chase': 'Chase Bank.png',
+  'the cheesecake factory': 'Cheesecake Factory.png',
+  'cheesecake factory': 'Cheesecake Factory.png',
+  'cracker barrel': 'Cracker Barrel.png',
+  'cracker barrel old country store': 'Cracker Barrel.png',
+  'cricket wireless': 'Cricket Wireless.png',
+  'dairy queen': 'Dairy Queen.png',
+  "denny's": 'Dennys.png',
+  'dennys': 'Dennys.png',
+  'dollar general': 'Dollar General.png',
+  'dg market': 'DG Market.png',
+  'dollar tree': 'Dollar Tree.png',
+  "domino's": 'Dominos.png',
+  "domino's pizza": 'Dominos.png',
+  'dominos': 'Dominos.png',
+  'family dollar': 'Family Dollar.png',
+  'fifth third bank': 'Fifth Third Bank.png',
+  'first national bank': 'First National Bank.png',
+  'first watch': 'First Watch.png',
+  'five guys': 'Five Guys.png',
+  "gabe's": 'Gabes.png',
+  'gabes': 'Gabes.png',
+  'goodwill': 'Goodwill.png',
+  'h&r block': 'HR Block.png',
+  'hr block': 'HR Block.png',
+  'harbor freight': 'Harbor Freight.png',
+  'harbor freight tools': 'Harbor Freight.png',
+  'hobby lobby': 'Hobby Lobby.png',
+  'home depot': 'Home Depot.png',
+  'the home depot': 'Home Depot.png',
+  'huntington bank': 'Huntington Bank.png',
+  'ihop': 'IHOP.png',
+  "jimmy john's": 'Jimmy Johns.png',
+  'jimmy johns': 'Jimmy Johns.png',
+  "kohl's": 'Kohls.png',
+  'kohls': 'Kohls.png',
+  'kroger': 'Kroger.png',
+  'la fitness': 'LA Fitness.png',
+  "lowe's": 'Lowes.png',
+  "lowe's home improvement": 'Lowes.png',
+  'lowes': 'Lowes.png',
+  'marshalls': 'Marshalls.png',
+  "moe's southwest grill": 'Moes Grill.png',
+  'moes grill': 'Moes Grill.png',
+  "ollie's bargain outlet": 'Ollies.png',
+  'ollies': 'Ollies.png',
+  'pnc': 'PNC.png',
+  'pnc bank': 'PNC.png',
+  'panda express': 'Panda Express.png',
+  'panera bread': 'Panera Bread.png',
+  'panera': 'Panera Bread.png',
+  "papa john's": 'Papa Johns.png',
+  'papa johns': 'Papa Johns.png',
+  'pep boys': 'Pep Boys.png',
+  'pizza hut': 'Pizza Hut.png',
+  'planet fitness': 'Planet Fitness.png',
+  'primanti bros': 'Primanti Bros.png',
+  "primanti brothers": 'Primanti Bros.png',
+  "primanti bros.": 'Primanti Bros.png',
+  'qdoba': 'Qdoba.png',
+  'qdoba mexican eats': 'Qdoba.png',
+  'qdoba mexican grill': 'Qdoba.png',
+  'rei': 'REI.png',
+  'red robin': 'Red Robin.png',
+  'red robin gourmet burgers': 'Red Robin.png',
+  'rite aid': 'Rite Aid.png',
+  'rural king': 'Rural King.png',
+  "sam's club": 'Sams Club.png',
+  'sams club': 'Sams Club.png',
+  'shop n save': 'Shop n Save.png',
+  "shop 'n save": 'Shop n Save.png',
+  'state farm': 'State Farm.png',
+  "steak 'n shake": 'Steak n Shake.png',
+  'steak n shake': 'Steak n Shake.png',
+  'subway': 'Subway.png',
+  'sunoco': 'Sunoco.png',
+  'tj maxx': 'TJ Maxx.png',
+  't.j. maxx': 'TJ Maxx.png',
+  'taco bell': 'Taco Bell.png',
+  'target': 'Target.png',
+  'texas roadhouse': 'Texas Roadhouse.png',
+  'tim hortons': 'Tim Hortons.png',
+  'tractor supply': 'Tractor Supply Company.png',
+  'tractor supply co.': 'Tractor Supply Company.png',
+  'tractor supply company': 'Tractor Supply Company.png',
+  'urban air': 'Urban Air.png',
+  'urban outfitters': 'Urban Outfitters.png',
+  'verizon': 'Verizon.png',
+  'verizon wireless': 'Verizon.png',
+  'walgreens': 'Walgreens.png',
+  'walmart': 'Walmart.png',
+  'walmart supercenter': 'Walmart.png',
+  'walmart neighborhood market': 'Walmart.png',
+  'white castle': 'White Castle.png',
+  'american freight': 'American Freight.png',
+  "einstein bros. bagels": 'Einstein Bros Bagels.png',
+  'einstein bros bagels': 'Einstein Bros Bagels.png',
+  'bealls outlet': 'Bealls Outlet.png',
+  "dunham's sports": 'Dunhams Sports.png',
+  'dunhams sports': 'Dunhams Sports.png',
+  "sportsman's warehouse": 'Sportsmans Warehouse.png',
+  'sportsmans warehouse': 'Sportsmans Warehouse.png',
+  'rent-a-center': 'Rent-A-Center.png',
+  'smokey bones': 'Smokey Bones.png',
+  'upmc': 'UPMC.png',
+  'napa auto parts': 'NAPA Auto Parts.png',
+  'napa': 'NAPA Auto Parts.png',
+  "o'reilly auto parts": 'OReilly Auto Parts.png',
+  'oreilly auto parts': 'OReilly Auto Parts.png',
+  "dunkin'": 'Dunkin.png',
+  'dunkin': 'Dunkin.png',
+  "dunkin' donuts": 'Dunkin.png',
+  'dunkin donuts': 'Dunkin.png',
+  'sheetz': 'Sheetz.png',
+  'sherwin-williams': 'Sherwin-Williams.png',
+  'sherwin williams': 'Sherwin-Williams.png',
+  'salvation army': 'Salvation Army.png',
+  'the salvation army': 'Salvation Army.png',
+  'true value': 'True Value.svg',
+  'true value of latrobe': 'True Value.svg',
+  "fox's pizza den": 'Foxs Pizza.png',
+  'foxs pizza den': 'Foxs Pizza.png',
+  "fox's pizza": 'Foxs Pizza.png',
+  'foxs pizza': 'Foxs Pizza.png',
+  // ── Additional major brands ──
+  "mcdonald's": 'McDonalds.png',
+  'mcdonalds': 'McDonalds.png',
+  '7-eleven': '7-Eleven.png',
+  '7 eleven': '7-Eleven.png',
+  'kfc': 'KFC.png',
+  'kentucky fried chicken': 'KFC.png',
+  "wendy's": 'Wendys.png',
+  'wendys': 'Wendys.png',
+  'starbucks': 'Starbucks.png',
+  'starbucks coffee': 'Starbucks.png',
+  'cvs': 'CVS.png',
+  'cvs pharmacy': 'CVS.png',
+  'cvs health': 'CVS.png',
+  'aldi': 'ALDI.png',
+  'giant eagle': 'Giant Eagle.png',
+  'giant eagle supermarket': 'Giant Eagle.png',
+  "jersey mike's": 'Jersey Mikes.png',
+  'jersey mikes': 'Jersey Mikes.png',
+  "jersey mike's subs": 'Jersey Mikes.png',
+  'petsmart': 'PetSmart.png',
+  'advance auto parts': 'Advance Auto Parts.png',
+  'circle k': 'Circle K.png',
+  'sonic': 'Sonic.png',
+  'sonic drive-in': 'Sonic.png',
+  'getgo': 'GetGo.png',
+  'get go': 'GetGo.png',
+  'petco': 'Petco.png',
+  'chick-fil-a': 'Chick-fil-A.png',
+  'chickfila': 'Chick-fil-A.png',
+  'chipotle': 'Chipotle.png',
+  'chipotle mexican grill': 'Chipotle.png',
+  "applebee's": 'Applebees.png',
+  'applebees': 'Applebees.png',
+  'olive garden': 'Olive Garden.png',
+  "popeyes": 'Popeyes.png',
+  "popeye's": 'Popeyes.png',
+  'popeyes louisiana kitchen': 'Popeyes.png',
+};
+
+function getLogoUrl(retailerName) {
+  const normalized = retailerName.toLowerCase().trim();
+  // Direct match
+  if (LOGO_FILES[normalized]) return `/logos/${LOGO_FILES[normalized]}`;
+  // Try without trailing punctuation/suffixes
+  for (const [key, file] of Object.entries(LOGO_FILES)) {
+    if (normalized.startsWith(key) || key.startsWith(normalized)) {
+      return `/logos/${file}`;
+    }
+  }
+  return null;
+}
+
+const LOGO_SIZE = 44; // Uniform height for all logo markers
+const WIDE_LOGO_W = 80; // wider container for landscape logos
+
+// Logos with aspect ratio > 2.2:1 — computed from actual image files
+const WIDE_LOGOS = new Set([
+  'ATI.png', 'ATT.png', 'Aladdins.png', 'American Freight.png', 'Audia.png',
+  'Bealls Outlet.png', 'Candlewood Suites.png', 'Dunhams Sports.png', 'Dunkin.png',
+  'Duquesne University.png', 'Emilianos Wide.png', 'Emilianos.png', 'Ensinger.png',
+  'Fairmont Supply.png', 'Family Dollar Dollar Tree.png', 'Freshens.jpg', 'Gabes.png',
+  'Hilton Garden Inn.png', 'Hobby Lobby.png', 'Jenis Ice Cream.png', 'Mad Mex.png',
+  'Marshalls.png', 'Maxines.png', 'Moonlit Burgers.png', 'NAPA Auto Parts.png',
+  'OReilly Auto Parts.png', 'Ollies.png', 'Pizza Milano White.png', 'PolyOne.png',
+  'Precision Marshall.png', 'Primanti Bros.png', 'SMS Group.png', 'Saga Hibachi.png',
+  'Sakura Japanese Steakhouse.png', 'Salems.png', 'Sheetz.png', 'Staybridge Suites.png',
+  'Subway.png', 'TJ Maxx.png', 'Tepache.png', 'Tim Hortons.png',
+  'Tractor Supply Company.png', 'Walgreens.png', 'Wingate by Wyndham.png',
+]);
+
+function isWideLogo(logoUrl) {
+  const filename = logoUrl.split('/').pop();
+  return WIDE_LOGOS.has(filename);
+}
+
+function createLogoIcon(logoUrl) {
+  const isWide = isWideLogo(logoUrl);
+  const markerW = isWide ? WIDE_LOGO_W : LOGO_SIZE;
+  const imgW = markerW - 10;
+  const imgH = LOGO_SIZE - 10;
+
+  return L.divIcon({
+    html: `<div class="logo-marker${isWide ? ' logo-wide' : ''}"><img src="${logoUrl}" alt="" style="width:${imgW}px;height:${imgH}px;object-fit:contain;" /></div>`,
+    className: '',
+    iconSize: [markerW, LOGO_SIZE],
+    iconAnchor: [markerW / 2, LOGO_SIZE / 2],
+    popupAnchor: [0, -LOGO_SIZE / 2],
+  });
+}
+
+// ── Smart Clustering + Collision-Avoidance System ────────────────
+// Groups overlapping markers into clusters, then displaces clusters/singles
+// so the subject property is never blocked and the map stays clean.
+
+const MARKER_PAD = 6;
+const CLUSTER_CELL = 32;       // px per logo cell inside cluster grid
+const CLUSTER_GAP = 2;         // px gap between cells
+const CLUSTER_PAD = 5;         // px padding inside cluster border
+const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
+const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
+
+// Zoom-adaptive merge distance: merge more at low zoom, less at high zoom
+function getClusterMergeDist(zoom) {
+  if (zoom >= 16) return 25;  // very close: barely cluster
+  if (zoom >= 14) return 35;  // medium-close
+  if (zoom >= 12) return 48;  // medium
+  return 60;                  // zoomed out: cluster aggressively
+}
+
+// Canvas renderer for connecting lines (html2canvas compatible)
+const canvasRenderer = L.canvas ? L.canvas({ padding: 0.5 }) : undefined;
+
+// ── Step 1: Group nearby markers into clusters (pixel space) ─────
+function buildClusters(map, items) {
+  const zoom = map.getZoom();
+  const mergeDist = getClusterMergeDist(zoom);
+
+  // Convert to pixel positions
+  const nodes = items.map((item, i) => {
+    const pt = map.latLngToContainerPoint(item.position);
+    return { ...item, px: pt.x, py: pt.y, clusterId: i };
+  });
+
+  // Union-find for merging
+  const parent = nodes.map((_, i) => i);
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+  function union(a, b) { parent[find(a)] = find(b); }
+
+  // Merge nodes that are within mergeDist px of each other
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dist = Math.hypot(nodes[i].px - nodes[j].px, nodes[i].py - nodes[j].py);
+      if (dist < mergeDist) {
+        union(i, j);
+      }
+    }
+  }
+
+  // Group by cluster root
+  const rawGroups = {};
+  nodes.forEach((node, i) => {
+    const root = find(i);
+    if (!rawGroups[root]) rawGroups[root] = [];
+    rawGroups[root].push(node);
+  });
+
+  // Split oversized clusters into smaller chunks
+  const groups = [];
+  Object.values(rawGroups).forEach((members) => {
+    if (members.length <= MAX_CLUSTER_SIZE) {
+      groups.push(members);
+    } else {
+      // Sort by position (left-to-right, top-to-bottom) then chunk
+      members.sort((a, b) => a.py - b.py || a.px - b.px);
+      for (let i = 0; i < members.length; i += MAX_CLUSTER_SIZE) {
+        groups.push(members.slice(i, i + MAX_CLUSTER_SIZE));
+      }
+    }
+  });
+
+  // Build cluster objects
+  return groups.map((members) => {
+    // Centroid of real positions (in pixels)
+    const cx = members.reduce((s, m) => s + m.px, 0) / members.length;
+    const cy = members.reduce((s, m) => s + m.py, 0) / members.length;
+    // Centroid in lat/lng
+    const centroidLL = map.containerPointToLatLng([cx, cy]);
+
+    if (members.length === 1) {
+      // Single marker — no clustering needed
+      const m = members[0];
+      const w = m.wide ? WIDE_LOGO_W : LOGO_SIZE;
+      return {
+        type: 'single',
+        items: [m],
+        cx, cy,
+        centroidLatLng: [centroidLL.lat, centroidLL.lng],
+        w: w + MARKER_PAD,
+        h: LOGO_SIZE + MARKER_PAD,
+      };
+    }
+
+    // Multi-marker cluster — compute grid dimensions
+    const count = members.length;
+    const cols = Math.min(count, MAX_CLUSTER_COLS);
+    const rows = Math.ceil(count / cols);
+    const gridW = cols * CLUSTER_CELL + (cols - 1) * CLUSTER_GAP + CLUSTER_PAD * 2;
+    const gridH = rows * CLUSTER_CELL + (rows - 1) * CLUSTER_GAP + CLUSTER_PAD * 2;
+
+    return {
+      type: 'cluster',
+      items: members,
+      cx, cy,
+      centroidLatLng: [centroidLL.lat, centroidLL.lng],
+      w: gridW + MARKER_PAD,
+      h: gridH + MARKER_PAD,
+      cols, rows, gridW, gridH,
+    };
+  });
+}
+
+// ── Step 2: Create a cluster divIcon showing a mini logo grid ────
+function createClusterGridIcon(cluster, childrenData) {
+  const { items, cols, gridW, gridH } = cluster;
+  const cells = items.map((item) => {
+    const child = childrenData.find((c) => c && c.idx === item.idx);
+    if (!child) return '<div class="sc-cell"></div>';
+    const logoUrl = child.logoUrl;
+    if (logoUrl) {
+      return `<div class="sc-cell"><img src="${logoUrl}" alt="" /></div>`;
+    }
+    // No logo — show initials with category color background
+    const cfg = getCategoryConfig(child.category || 'Other');
+    const initials = (child.name || '?').substring(0, 2);
+    return `<div class="sc-cell sc-cell-text" style="background:${cfg.color}33;color:${cfg.color}">${initials}</div>`;
+  }).join('');
+
+  return L.divIcon({
+    html: `<div class="smart-cluster" style="width:${gridW}px;height:${gridH}px;grid-template-columns:repeat(${cols},${CLUSTER_CELL}px);">${cells}<div class="sc-count">${items.length}</div></div>`,
+    className: '',
+    iconSize: [gridW, gridH],
+    iconAnchor: [gridW / 2, gridH / 2],
+    popupAnchor: [0, -gridH / 2],
+  });
+}
+
+// ── Step 3: Collision-avoidance (displace clusters + singles) ────
+function rectsOverlap(a, b) {
+  return !(a.x + a.w / 2 < b.x - b.w / 2 ||
+           a.x - a.w / 2 > b.x + b.w / 2 ||
+           a.y + a.h / 2 < b.y - b.h / 2 ||
+           a.y - a.h / 2 > b.y + b.h / 2);
+}
+
+function pushApart(mover, anchor, strength) {
+  let dx = mover.x - anchor.x;
+  let dy = mover.y - anchor.y;
+  // Minimum push to clear overlap
+  const overlapX = (mover.w + anchor.w) / 2 - Math.abs(dx);
+  const overlapY = (mover.h + anchor.h) / 2 - Math.abs(dy);
+  if (overlapX <= 0 || overlapY <= 0) return;
+  if (overlapX < overlapY) {
+    mover.x += Math.sign(dx || 1) * overlapX * strength;
+  } else {
+    mover.y += Math.sign(dy || 1) * overlapY * strength;
+  }
+}
+
+function displaceClusterRects(map, clusters, propertyLatLng) {
+  // Build movable rects for each cluster/single
+  const rects = clusters.map((c, i) => ({
+    x: c.cx, y: c.cy,
+    w: c.w, h: c.h,
+    origX: c.cx, origY: c.cy,
+    idx: i,
+  }));
+
+  // Subject property rect (pinned, never moves)
+  const propPt = map.latLngToContainerPoint(propertyLatLng);
+  const propRect = { x: propPt.x, y: propPt.y, w: 140 + MARKER_PAD, h: 76 + MARKER_PAD };
+
+  for (let iter = 0; iter < 35; iter++) {
+    let moved = false;
+
+    // Push away from subject property first (full strength, highest priority)
+    for (const r of rects) {
+      if (rectsOverlap(r, propRect)) {
+        pushApart(r, propRect, 1.0);
+        moved = true;
+      }
+    }
+
+    // Push clusters/singles apart from each other (stronger push)
+    for (let i = 0; i < rects.length; i++) {
+      for (let j = i + 1; j < rects.length; j++) {
+        if (rectsOverlap(rects[i], rects[j])) {
+          pushApart(rects[i], rects[j], 0.6);
+          moved = true;
+        }
+      }
+    }
+
+    if (!moved) break;
+  }
+
+  return rects.map((r) => {
+    const displacedLL = map.containerPointToLatLng([r.x, r.y]);
+    const dist = Math.hypot(r.x - r.origX, r.y - r.origY);
+    return {
+      idx: r.idx,
+      displacedLatLng: [displacedLL.lat, displacedLL.lng],
+      wasDisplaced: dist > 3,
+    };
+  });
+}
+
+// ── Step 4: SmartClusterLayer component ──────────────────────────
+function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng }) {
+  const map = useMap();
+  const layerGroupRef = useRef(null);
+  const linesGroupRef = useRef(null);
+
+  useEffect(() => {
+    const layers = L.layerGroup().addTo(map);
+    const lines = L.layerGroup().addTo(map);
+    layerGroupRef.current = layers;
+    linesGroupRef.current = lines;
+    return () => {
+      map.removeLayer(layers);
+      map.removeLayer(lines);
+    };
+  }, [map]);
+
+  useEffect(() => {
+    const layers = layerGroupRef.current;
+    const lines = linesGroupRef.current;
+    if (!layers || !lines) return;
+
+    function render() {
+      layers.clearLayers();
+      lines.clearLayers();
+      if (markerRefs) markerRefs.current = {};
+
+      if (!Array.isArray(children) || children.length === 0 || !propertyLatLng) return;
+
+      const propLL = L.latLng(propertyLatLng[0], propertyLatLng[1]);
+
+      // Build item list
+      const items = children.map((child) => ({
+        position: L.latLng(child.position[0], child.position[1]),
+        wide: child.icon?.options?.iconSize?.[0] > LOGO_SIZE,
+        idx: child.idx,
+      }));
+
+      // Step 1: Build clusters
+      const clusters = buildClusters(map, items);
+
+      // Step 2: Displace clusters to avoid subject property + each other
+      const displaced = displaceClusterRects(map, clusters, propLL);
+
+      // Step 3: Render each cluster or single marker
+      clusters.forEach((cluster, ci) => {
+        const dp = displaced[ci];
+        if (!dp) return;
+
+        if (cluster.type === 'single') {
+          // Render single marker at displaced position
+          const item = cluster.items[0];
+          const child = children.find((c) => c && c.idx === item.idx);
+          if (!child) return;
+
+          const marker = L.marker(dp.displacedLatLng, { icon: child.icon });
+          if (child.popup) marker.bindPopup(child.popup);
+          marker.on('click', () => {
+            if (onMarkerClick) onMarkerClick(item.idx);
+          });
+          if (markerRefs) markerRefs.current[`r-${item.idx}`] = marker;
+          layers.addLayer(marker);
+        } else {
+          // Render cluster icon at displaced position
+          const icon = createClusterGridIcon(cluster, children);
+          const marker = L.marker(dp.displacedLatLng, { icon });
+
+          // Build cluster popup listing all retailers
+          const names = cluster.items.map((item) => {
+            const child = children.find((c) => c && c.idx === item.idx);
+            return child?.name || '';
+          }).filter(Boolean);
+          marker.bindPopup(
+            `<div class="popup-name">${names.length} Retailers</div>` +
+            names.map((n) => `<div class="popup-address">${n}</div>`).join('')
+          );
+
+          // Click handler — click opens popup; individual items reachable via sidebar
+          marker.on('click', () => {
+            // Highlight first item in cluster
+            if (cluster.items.length > 0 && onMarkerClick) {
+              onMarkerClick(cluster.items[0].idx);
+            }
+          });
+
+          // Store ref for all items in this cluster
+          cluster.items.forEach((item) => {
+            if (markerRefs) markerRefs.current[`r-${item.idx}`] = marker;
+          });
+          layers.addLayer(marker);
+        }
+
+        // Draw connecting line if displaced
+        if (dp.wasDisplaced) {
+          const line = L.polyline(
+            [dp.displacedLatLng, cluster.centroidLatLng],
+            {
+              weight: 1.5,
+              color: '#8a9aaa',
+              opacity: 0.5,
+              dashArray: '4 3',
+              interactive: false,
+              renderer: canvasRenderer,
+            }
+          );
+          lines.addLayer(line);
+
+          // Anchor dot at real centroid
+          const anchor = L.circleMarker(cluster.centroidLatLng, {
+            radius: 3,
+            fillColor: '#8a9aaa',
+            fillOpacity: 0.5,
+            stroke: false,
+            interactive: false,
+            renderer: canvasRenderer,
+          });
+          lines.addLayer(anchor);
+        }
+      });
+    }
+
+    render();
+
+    // Debounced re-render on zoom/pan to avoid excessive recalculation
+    let timer = null;
+    const debouncedRender = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(render, 120);
+    };
+
+    map.on('zoomend', debouncedRender);
+    map.on('moveend', debouncedRender);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      map.off('zoomend', debouncedRender);
+      map.off('moveend', debouncedRender);
+    };
+  }, [children, onMarkerClick, markerRefs, propertyLatLng, map]);
+
+  return null;
+}
+
+// ── Map helper component ─────────────────────────────────────────
+function MapController({ flyTo, fitBounds }) {
+  const map = useMap();
+  useEffect(() => {
+    if (fitBounds) {
+      map.fitBounds(fitBounds, { padding: [40, 40], maxZoom: 15 });
+    }
+  }, [fitBounds, map]);
+  useEffect(() => {
+    if (flyTo) {
+      map.flyTo(flyTo, 16, { duration: 0.8 });
+    }
+  }, [flyTo, map]);
+  return null;
+}
+
+// ── Property types ───────────────────────────────────────────────
+const PROPERTY_TYPES = [
+  'Retail Strip Center',
+  'Anchored Shopping Center',
+  'Inline Retail Space',
+  'Pad Site / Outparcel',
+  'Mixed-Use Development',
+  'Urban / High Street Retail',
+  'Neighborhood Center',
+];
+
+// ── Build the Claude prompt ──────────────────────────────────────
+function buildPrompt(address, radius, propertyType, verifiedLat, verifiedLng) {
+  const coordLine = verifiedLat != null
+    ? `\nVERIFIED subject property coordinates: lat ${verifiedLat}, lng ${verifiedLng}. Use these exact coordinates for the property.`
+    : '';
+  return `You are a commercial real estate data expert with deep knowledge of national retail tenant locations across US markets.
+
+Subject property: ${address}${coordLine}
+Property type: ${propertyType}
+Search radius: ${radius} miles
+
+Task: Identify 25-35 national and regional retailers, restaurants, and services that actually operate within approximately ${radius} miles of this address. For each retailer provide: name, category, full street address, approximate lat, approximate lng, and distance_miles from the subject property.
+
+Include a diverse mix of categories: grocery, pharmacy, fast food, casual dining, coffee, fitness, home improvement, banking, auto, entertainment, department store, discount/value, pet, cellular/tech, convenience.
+
+Only include retailers that actually have locations in this specific area. Use real street addresses.
+
+Return ONLY a raw JSON object with no markdown fences, no explanation, no preamble. The JSON must have this exact shape:
+{ "property": { "lat": ${verifiedLat ?? 0.0}, "lng": ${verifiedLng ?? 0.0}, "display": "full address string" }, "retailers": [ { "name": "", "category": "", "address": "", "lat": 0.0, "lng": 0.0, "distance_miles": 0.0 } ] }`;
+}
+
+// ── CSV export ───────────────────────────────────────────────────
+function exportCSV(property, retailers) {
+  const lines = [];
+  lines.push(`Subject Property,"${property.display}",${property.lat},${property.lng}`);
+  lines.push('Name,Category,Address,Lat,Lng,Distance (mi)');
+  retailers.forEach((r) => {
+    lines.push(
+      `"${r.name}","${r.category}","${r.address}",${r.lat},${r.lng},${r.distance_miles}`
+    );
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const slug = property.display
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .substring(0, 60);
+  a.href = url;
+  a.download = `${slug}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Main App ─────────────────────────────────────────────────────
+export default function App() {
+  const [address, setAddress] = useState('');
+  const [radius, setRadius] = useState('3');
+  const [propertyType, setPropertyType] = useState(PROPERTY_TYPES[0]);
+  const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
+  const [error, setError] = useState('');
+  const [data, setData] = useState(null);
+  const [activeIdx, setActiveIdx] = useState(null);
+  const [flyTo, setFlyTo] = useState(null);
+  const [fitBounds, setFitBounds] = useState(null);
+
+  // Filter state
+  const [activeCategories, setActiveCategories] = useState(new Set());
+  const [activeChainSizes, setActiveChainSizes] = useState(new Set());
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const markerRefs = useRef({});
+  const cardRefs = useRef({});
+  const mapRef = useRef(null);
+  const mapPanelRef = useRef(null);
+
+  // Available categories and chain sizes from current data
+  const availableCategories = useMemo(() => {
+    if (!data) return [];
+    const cats = [...new Set(data.retailers.map((r) => r.category))];
+    cats.sort();
+    return cats;
+  }, [data]);
+
+  const availableChainSizes = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.retailers.map((r) => r.chainSize || 'Regional/Local'))];
+  }, [data]);
+
+  // Filtered retailers
+  const filteredRetailers = useMemo(() => {
+    if (!data) return [];
+    return data.retailers.filter((r) => {
+      if (activeCategories.size > 0 && !activeCategories.has(r.category)) return false;
+      if (activeChainSizes.size > 0 && !activeChainSizes.has(r.chainSize || 'Regional/Local')) return false;
+      return true;
+    });
+  }, [data, activeCategories, activeChainSizes]);
+
+  // Toggle helpers
+  const toggleCategory = useCallback((cat) => {
+    setActiveCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }, []);
+
+  const toggleChainSize = useCallback((size) => {
+    setActiveChainSizes((prev) => {
+      const next = new Set(prev);
+      if (next.has(size)) next.delete(size);
+      else next.add(size);
+      return next;
+    });
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setActiveCategories(new Set());
+    setActiveChainSizes(new Set());
+  }, []);
+
+  // Haversine distance
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R = 3958.8;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // Generate map
+  const handleGenerate = useCallback(async () => {
+    if (!address.trim()) {
+      setError('Please enter a property address.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    setLoadingStatus('Geocoding subject property\u2026');
+    setData(null);
+    setActiveIdx(null);
+    setFlyTo(null);
+    setFitBounds(null);
+    setActiveCategories(new Set());
+    setActiveChainSizes(new Set());
+
+    try {
+      // Step 1: Geocode subject property via Nominatim
+      let verifiedLat = null;
+      let verifiedLng = null;
+      try {
+        const geoRes = await fetch('/api/geocode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: address.trim() }),
+        });
+        const geoData = await geoRes.json();
+        if (geoData.lat && geoData.lng) {
+          verifiedLat = geoData.lat;
+          verifiedLng = geoData.lng;
+        }
+      } catch {
+        // Continue without verified coords
+      }
+
+      if (verifiedLat == null) {
+        throw new Error('Could not geocode the subject property address. Please check the address and try again.');
+      }
+
+      // Step 2: Search nearby places via Google Places API
+      setLoadingStatus('Searching nearby retailers\u2026');
+      const res = await fetch('/api/places-nearby', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat: verifiedLat,
+          lng: verifiedLng,
+          radiusMiles: parseFloat(radius),
+          propertyAddress: address.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || `API returned ${res.status}`);
+      }
+
+      const parsed = await res.json();
+      if (!parsed.property || !parsed.retailers) {
+        throw new Error('Response missing required fields.');
+      }
+
+      if (parsed.retailers.length === 0) {
+        throw new Error('No retailers found within the search radius. Try increasing the radius.');
+      }
+
+      setData(parsed);
+
+      // Build bounds
+      const allPts = [
+        [parsed.property.lat, parsed.property.lng],
+        ...parsed.retailers.map((r) => [r.lat, r.lng]),
+      ];
+      setFitBounds(allPts);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  }, [address, radius, propertyType]);
+
+  // Sidebar card click → fly to marker and open popup
+  const handleCardClick = useCallback((idx) => {
+    setActiveIdx(idx);
+    const marker = markerRefs.current[`r-${idx}`];
+    if (marker) {
+      const ll = marker.getLatLng();
+      setFlyTo([ll.lat, ll.lng]);
+      setTimeout(() => {
+        if (marker._map) marker.openPopup();
+      }, 900);
+    }
+  }, []);
+
+  // Map marker click → highlight sidebar card, scroll into view
+  const handleMarkerClick = useCallback((idx) => {
+    setActiveIdx(idx);
+    const card = cardRefs.current[`c-${idx}`];
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, []);
+
+  // Fit all markers
+  const handleFitAll = useCallback(() => {
+    if (!data) return;
+    const allPts = [
+      [data.property.lat, data.property.lng],
+      ...data.retailers.map((r) => [r.lat, r.lng]),
+    ];
+    setFitBounds([...allPts]); // spread to create new reference
+  }, [data]);
+
+  // Clear map
+  const handleClear = useCallback(() => {
+    setData(null);
+    setActiveIdx(null);
+    setFlyTo(null);
+    setFitBounds(null);
+    setError('');
+  }, []);
+
+  // Fix object-fit images for html2canvas (which doesn't support object-fit)
+  function fixObjectFitForExport(container) {
+    const imgs = container.querySelectorAll('.logo-marker img, .sc-cell img');
+    const originals = [];
+    imgs.forEach((img) => {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      const boxW = img.clientWidth || parseInt(img.style.width) || 34;
+      const boxH = img.clientHeight || parseInt(img.style.height) || 34;
+      const imgRatio = img.naturalWidth / img.naturalHeight;
+      const boxRatio = boxW / boxH;
+      let drawW, drawH;
+      if (imgRatio > boxRatio) {
+        drawW = boxW;
+        drawH = boxW / imgRatio;
+      } else {
+        drawH = boxH;
+        drawW = boxH * imgRatio;
+      }
+      originals.push({ img, origStyle: img.getAttribute('style') });
+      img.style.width = drawW + 'px';
+      img.style.height = drawH + 'px';
+      img.style.objectFit = 'fill';
+    });
+    return originals;
+  }
+
+  function restoreObjectFit(originals) {
+    originals.forEach(({ img, origStyle }) => {
+      img.setAttribute('style', origStyle);
+    });
+  }
+
+  // Export map as high-res PNG
+  const handleExportImage = useCallback(async () => {
+    if (!mapPanelRef.current) return;
+    // Hide controls during capture
+    const controls = mapPanelRef.current.querySelectorAll('.map-controls, .leaflet-control-zoom, .leaflet-control-attribution');
+    controls.forEach((el) => (el.style.display = 'none'));
+    const fixed = fixObjectFitForExport(mapPanelRef.current);
+    try {
+      const canvas = await html2canvas(mapPanelRef.current, {
+        scale: 3, // 3x for high-res print quality
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+      restoreObjectFit(fixed);
+      controls.forEach((el) => (el.style.display = ''));
+      const link = document.createElement('a');
+      const slug = data?.property?.display
+        ?.replace(/[^a-zA-Z0-9]+/g, '_')
+        ?.replace(/^_|_$/g, '')
+        ?.substring(0, 40) || 'retailer_map';
+      link.download = `${slug}_map.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      restoreObjectFit(fixed);
+      controls.forEach((el) => (el.style.display = ''));
+      console.error('Export error:', err);
+    }
+  }, [data]);
+
+  // Export map as PDF (landscape, full page)
+  const handleExportPDF = useCallback(async () => {
+    if (!mapPanelRef.current) return;
+    const controls = mapPanelRef.current.querySelectorAll('.map-controls, .leaflet-control-zoom, .leaflet-control-attribution');
+    controls.forEach((el) => (el.style.display = 'none'));
+    const fixed = fixObjectFitForExport(mapPanelRef.current);
+    try {
+      const canvas = await html2canvas(mapPanelRef.current, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+      });
+      restoreObjectFit(fixed);
+      controls.forEach((el) => (el.style.display = ''));
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgRatio = canvas.width / canvas.height;
+      const pageRatio = pageW / pageH;
+      let drawW, drawH, drawX, drawY;
+      if (imgRatio > pageRatio) {
+        drawW = pageW;
+        drawH = pageW / imgRatio;
+        drawX = 0;
+        drawY = (pageH - drawH) / 2;
+      } else {
+        drawH = pageH;
+        drawW = pageH * imgRatio;
+        drawX = (pageW - drawW) / 2;
+        drawY = 0;
+      }
+      pdf.addImage(imgData, 'PNG', drawX, drawY, drawW, drawH);
+      const slug = data?.property?.display
+        ?.replace(/[^a-zA-Z0-9]+/g, '_')
+        ?.replace(/^_|_$/g, '')
+        ?.substring(0, 40) || 'retailer_map';
+      pdf.save(`${slug}_map.pdf`);
+    } catch (err) {
+      restoreObjectFit(fixed);
+      controls.forEach((el) => (el.style.display = ''));
+      console.error('PDF export error:', err);
+    }
+  }, [data]);
+
+  return (
+    <div className="app">
+      {/* ─── Sidebar ─── */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="brand-name">The Colony Agency</div>
+          <div className="brand-subtitle">Retailer Map Generator</div>
+        </div>
+
+        {/* Form */}
+        <div className="form-section">
+          <div className="form-group">
+            <label className="form-label">Address</label>
+            <input
+              className="form-input"
+              type="text"
+              placeholder="e.g. 533 Depot St, Latrobe, PA"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Radius</label>
+            <select
+              className="form-select"
+              value={radius}
+              onChange={(e) => setRadius(e.target.value)}
+            >
+              <option value="1">1 Mile</option>
+              <option value="2">2 Miles</option>
+              <option value="3">3 Miles</option>
+              <option value="5">5 Miles</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Property Type</label>
+            <select
+              className="form-select"
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value)}
+            >
+              {PROPERTY_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="btn-generate"
+            disabled={loading}
+            onClick={handleGenerate}
+          >
+            {loading ? 'Generating\u2026' : 'Generate Map'}
+          </button>
+          {error && <div className="error-msg">{error}</div>}
+        </div>
+
+        {/* Retailer List */}
+        <div className="retailer-list-section">
+          {data ? (
+            <>
+              <div className="list-header">
+                Retailers
+                <span className="list-count">
+                  {filteredRetailers.length}
+                  {filteredRetailers.length !== data.retailers.length
+                    ? ` / ${data.retailers.length}`
+                    : ''}{' '}
+                  found
+                </span>
+              </div>
+
+              {/* Filters */}
+              <div className="filter-section">
+                <button
+                  className="filter-toggle"
+                  onClick={() => setFiltersOpen((prev) => !prev)}
+                >
+                  <span className="filter-toggle-label">
+                    Filters
+                    {(activeCategories.size > 0 || activeChainSizes.size > 0) && (
+                      <span className="filter-active-count">
+                        {activeCategories.size + activeChainSizes.size}
+                      </span>
+                    )}
+                  </span>
+                  <svg
+                    className={`filter-toggle-arrow${filtersOpen ? ' open' : ''}`}
+                    width="10"
+                    height="6"
+                    viewBox="0 0 10 6"
+                    fill="none"
+                  >
+                    <path
+                      d="M1 1L5 5L9 1"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                {filtersOpen && (
+                  <div className="filter-body">
+                    <div className="filter-group">
+                      <div className="filter-label">Type</div>
+                      <div className="filter-chips">
+                        {availableChainSizes.map((size) => (
+                          <button
+                            key={size}
+                            className={`filter-chip${activeChainSizes.has(size) ? ' active' : ''}`}
+                            onClick={() => toggleChainSize(size)}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="filter-group">
+                      <div className="filter-label">Category</div>
+                      <div className="filter-chips">
+                        {availableCategories.map((cat) => {
+                          const cfg = getCategoryConfig(cat);
+                          return (
+                            <button
+                              key={cat}
+                              className={`filter-chip${activeCategories.has(cat) ? ' active' : ''}`}
+                              style={activeCategories.has(cat) ? { borderColor: cfg.color, background: cfg.color + '22' } : {}}
+                              onClick={() => toggleCategory(cat)}
+                            >
+                              {cfg.emoji} {cat}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {(activeCategories.size > 0 || activeChainSizes.size > 0) && (
+                      <button className="filter-clear" onClick={clearFilters}>
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="retailer-list">
+                {filteredRetailers.map((r) => {
+                  const origIdx = data.retailers.indexOf(r);
+                  const cfg = getCategoryConfig(r.category);
+                  return (
+                    <div
+                      key={origIdx}
+                      ref={(el) => (cardRefs.current[`c-${origIdx}`] = el)}
+                      className={`retailer-card${activeIdx === origIdx ? ' active' : ''}`}
+                      onClick={() => handleCardClick(origIdx)}
+                    >
+                      <div
+                        className="card-dot"
+                        style={{ background: cfg.color }}
+                      />
+                      <div className="card-info">
+                        <div className="card-name">
+                          {r.name}
+                          {r.chainSize === 'National' && (
+                            <span className="chain-badge national">National</span>
+                          )}
+                        </div>
+                        <div className="card-category">{r.category}</div>
+                        <div className="card-address">{r.address}</div>
+                      </div>
+                      <div className="card-distance">
+                        {r.distance_miles.toFixed(1)} mi
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">{'\u{1F5FA}'}</div>
+              <div className="empty-title">No Map Generated</div>
+              <div className="empty-desc">
+                Enter a property address, select a radius and property type, then
+                click Generate Map.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Export */}
+        <div className="export-section">
+          <div className="export-buttons">
+            <button
+              className="btn-export primary"
+              disabled={!data}
+              onClick={handleExportImage}
+            >
+              Export PNG
+            </button>
+            <button
+              className="btn-export primary"
+              disabled={!data}
+              onClick={handleExportPDF}
+            >
+              Export PDF
+            </button>
+            <button
+              className="btn-export"
+              disabled={!data}
+              onClick={() => data && exportCSV(data.property, data.retailers)}
+            >
+              Export CSV
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* ─── Map Panel ─── */}
+      <div className="map-panel" ref={mapPanelRef}>
+        {data && (
+          <div className="map-controls">
+            <button className="map-btn" onClick={handleFitAll}>
+              Fit All Markers
+            </button>
+            <button className="map-btn" onClick={handleClear}>
+              Clear Map
+            </button>
+          </div>
+        )}
+
+        <MapContainer
+          center={[40.4406, -79.9959]}
+          zoom={12}
+          style={{ width: '100%', height: '100%' }}
+          ref={mapRef}
+        >
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+            subdomains="abcd"
+            maxZoom={20}
+          />
+          <MapController flyTo={flyTo} fitBounds={fitBounds} />
+
+          {/* Subject property marker (highest z-index) */}
+          {data && (
+            <Marker
+              position={[data.property.lat, data.property.lng]}
+              icon={createPropertyIcon()}
+              zIndexOffset={10000}
+            >
+              <Popup>
+                <div className="popup-name">Subject Property</div>
+                <div className="popup-address">{data.property.display}</div>
+              </Popup>
+            </Marker>
+          )}
+
+          {/* Retailer markers (smart clusters + collision avoidance) */}
+          <SmartClusterLayer
+            onMarkerClick={handleMarkerClick}
+            markerRefs={markerRefs}
+            propertyLatLng={data ? [data.property.lat, data.property.lng] : null}
+          >
+            {data?.retailers.map((r, i) => {
+              if (!filteredRetailers.includes(r)) return null;
+              const cfg = getCategoryConfig(r.category);
+              const logoUrl = getLogoUrl(r.name);
+              return {
+                position: [r.lat, r.lng],
+                icon: logoUrl ? createLogoIcon(logoUrl) : createRetailerIcon(r.category),
+                idx: i,
+                name: r.name,
+                category: r.category,
+                logoUrl: logoUrl || null,
+                popup: `<div class="popup-name">${r.name}</div>
+                  <div class="popup-category" style="color:${cfg.color}">${cfg.emoji} ${r.category}</div>
+                  <div class="popup-address">${r.address}</div>
+                  <div class="popup-distance">${r.distance_miles.toFixed(1)} miles from property</div>`,
+              };
+            }).filter(Boolean)}
+          </SmartClusterLayer>
+        </MapContainer>
+
+        {loading && (
+          <div className="loading-bar">
+            <div className="spinner" />
+            <div className="loading-text">{loadingStatus || 'Generating retailer map\u2026'}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

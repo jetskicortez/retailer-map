@@ -1101,14 +1101,29 @@ export default function App() {
     try {
       const canvas = await captureMapForExport();
       if (!canvas) return;
-      const link = document.createElement('a');
       const slug = data?.property?.display
         ?.replace(/[^a-zA-Z0-9]+/g, '_')
         ?.replace(/^_|_$/g, '')
         ?.substring(0, 40) || 'retailer_map';
+
+      // Use toBlob + createObjectURL — much more reliable than toDataURL
+      // on mobile where large data URIs can silently fail or get truncated
+      const blob = await new Promise((resolve) =>
+        canvas.toBlob(resolve, 'image/png')
+      );
+      if (!blob) {
+        console.error('Failed to create PNG blob');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
       link.download = `${slug}_map.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = url;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      // Revoke after a short delay to ensure download starts
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (err) {
       console.error('Export error:', err);
     }

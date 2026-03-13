@@ -1098,46 +1098,60 @@ export default function App() {
 
   // Export map as high-res PNG (8.5×11 landscape)
   const handleExportImage = useCallback(async () => {
+    // Open a new window IMMEDIATELY (synchronous with click) so popup
+    // blockers don't prevent it. We'll populate it after capture.
+    const win = window.open('', '_blank');
+
     try {
       const canvas = await captureMapForExport();
-      if (!canvas) return;
+      if (!canvas) {
+        if (win) win.close();
+        return;
+      }
       const slug = data?.property?.display
         ?.replace(/[^a-zA-Z0-9]+/g, '_')
         ?.replace(/^_|_$/g, '')
         ?.substring(0, 40) || 'retailer_map';
       const filename = `${slug}_map.png`;
+      const dataUrl = canvas.toDataURL('image/png');
 
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, 'image/png')
-      );
-      if (!blob) {
-        console.error('Failed to create PNG blob');
-        return;
+      if (win) {
+        // Write the landscape PNG into the new tab — user can long-press
+        // (mobile) or right-click (desktop) to save the image
+        win.document.write(`<!DOCTYPE html>
+<html><head><title>${filename}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body { margin:0; background:#f0f0f0; display:flex;
+         align-items:center; justify-content:center; min-height:100vh; }
+  img  { max-width:100%; height:auto; box-shadow:0 2px 20px rgba(0,0,0,.3); }
+  p    { text-align:center; font-family:system-ui; color:#666;
+         padding:12px; font-size:14px; }
+</style></head><body>
+<div>
+  <p>Long-press the image below to save it</p>
+  <img src="${dataUrl}" alt="${filename}" />
+</div>
+</body></html>`);
+        win.document.close();
+      } else {
+        // Popup blocked — fall back to download link
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, 'image/png')
+        );
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
       }
-
-      // On mobile, try the native share sheet (best UX for saving images)
-      if (navigator.share && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
-        try {
-          const file = new File([blob], filename, { type: 'image/png' });
-          await navigator.share({ files: [file] });
-          return;
-        } catch (shareErr) {
-          // User cancelled share or share not supported for files — fall through
-          if (shareErr.name === 'AbortError') return;
-        }
-      }
-
-      // Desktop / fallback: standard download via blob URL
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = url;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (err) {
       console.error('Export error:', err);
+      if (win) win.close();
     }
   }, [data, captureMapForExport]);
 

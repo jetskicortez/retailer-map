@@ -655,6 +655,7 @@ body {
   object-fit: contain;
   display: block;
   pointer-events: none;
+  background: #ffffff;
 }
 
 /* Let touch events pass through to Leaflet's drag handler */
@@ -715,6 +716,7 @@ body {
   max-height: 40px;
   object-fit: contain;
   display: block;
+  background: #ffffff;
 }
 
 .sc-cell-text {

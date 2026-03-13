@@ -324,9 +324,12 @@ function getLogoMarkerW(logoUrl) {
 
 function createLogoIcon(logoUrl) {
   const markerW = getLogoMarkerW(logoUrl);
+  // Inner dimensions after padding (5px) and border (2px) on each side
+  const innerW = markerW - 14;
+  const innerH = LOGO_H - 14;
 
   return L.divIcon({
-    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" /></div>`,
+    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" style="width:${innerW}px;height:${innerH}px;object-fit:contain;background:#fff;" onerror="this.style.display='none'" /></div>`,
     className: '',
     iconSize: [markerW, LOGO_H],
     iconAnchor: [markerW / 2, LOGO_H / 2],
@@ -512,7 +515,7 @@ function createClusterGridIcon(cluster, childrenData) {
     if (!child) return '<div class="sc-cell"></div>';
     const logoUrl = child.logoUrl;
     if (logoUrl) {
-      return `<div class="sc-cell"><img src="${logoUrl}" alt="" /></div>`;
+      return `<div class="sc-cell"><img src="${logoUrl}" alt="" style="width:40px;height:40px;object-fit:contain;background:#fff;" onerror="this.style.display='none'" /></div>`;
     }
     // No logo — show initials with category color background
     const cfg = getCategoryConfig(child.category || 'Other');

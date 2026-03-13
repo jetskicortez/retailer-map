@@ -78,8 +78,8 @@ function createRetailerIcon(category) {
   const cfg = getCategoryConfig(category);
   const svg = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
     <path d="M14 35C14 35 27 22 27 13C27 6 21 1 14 1C7 1 1 6 1 13C1 22 14 35 14 35Z"
-          fill="${cfg.color}" stroke="#0f1923" stroke-width="1.5"/>
-    <circle cx="14" cy="13" r="9" fill="#0f1923" opacity="0.35"/>
+          fill="${cfg.color}" stroke="#ffffff" stroke-width="1.5"/>
+    <circle cx="14" cy="13" r="9" fill="#ffffff" opacity="0.5"/>
     <text x="14" y="17" text-anchor="middle" font-size="12">${cfg.emoji}</text>
   </svg>`;
   return L.divIcon({
@@ -702,7 +702,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           layers.addLayer(marker);
         }
 
-        // Draw connecting line from marker back to true centroid
+        // Draw arrow connector from marker to true centroid location
         const finalLatLng = overridePos || dp.displacedLatLng;
         const origLatLng = cluster.centroidLatLng;
         const finalPt = map.latLngToContainerPoint(finalLatLng);
@@ -710,29 +710,47 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const lineDist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
 
         if (lineDist > 3) {
+          // Solid connector line
           const line = L.polyline(
             [finalLatLng, origLatLng],
             {
               weight: 1.5,
-              color: '#8a9aaa',
-              opacity: 0.5,
-              dashArray: '4 3',
+              color: '#555555',
+              opacity: 0.7,
               interactive: false,
               renderer: canvasRenderer,
             }
           );
           lines.addLayer(line);
 
-          // Anchor dot at real centroid
-          const anchor = L.circleMarker(origLatLng, {
-            radius: 3,
-            fillColor: '#8a9aaa',
-            fillOpacity: 0.5,
-            stroke: false,
-            interactive: false,
-            renderer: canvasRenderer,
-          });
-          lines.addLayer(anchor);
+          // Arrowhead at the centroid end (pointing to actual location)
+          const dx = origPt.x - finalPt.x;
+          const dy = origPt.y - finalPt.y;
+          const angle = Math.atan2(dy, dx);
+          const arrowLen = 8;
+          const arrowSpread = Math.PI / 6; // 30 degrees
+          const tipX = origPt.x;
+          const tipY = origPt.y;
+          const leftX = tipX - arrowLen * Math.cos(angle - arrowSpread);
+          const leftY = tipY - arrowLen * Math.sin(angle - arrowSpread);
+          const rightX = tipX - arrowLen * Math.cos(angle + arrowSpread);
+          const rightY = tipY - arrowLen * Math.sin(angle + arrowSpread);
+          const tipLL = map.containerPointToLatLng([tipX, tipY]);
+          const leftLL = map.containerPointToLatLng([leftX, leftY]);
+          const rightLL = map.containerPointToLatLng([rightX, rightY]);
+
+          // Arrow wings
+          const arrow = L.polyline(
+            [[leftLL.lat, leftLL.lng], [tipLL.lat, tipLL.lng], [rightLL.lat, rightLL.lng]],
+            {
+              weight: 2,
+              color: '#555555',
+              opacity: 0.7,
+              interactive: false,
+              renderer: canvasRenderer,
+            }
+          );
+          lines.addLayer(arrow);
         }
       });
     }
@@ -1109,7 +1127,9 @@ export default function App() {
     hidden.forEach((el) => (el.style.display = 'none'));
     globalHidden.forEach((el) => (el.style.display = 'none'));
 
-    // Save original cssText so we can restore everything
+    // Save original map state so we can restore after capture
+    const origCenter = map ? map.getCenter() : null;
+    const origZoom = map ? map.getZoom() : null;
     const origCss = panel.style.cssText;
     const origAppCss = panel.parentElement?.style.cssText || '';
 
@@ -1141,15 +1161,39 @@ export default function App() {
       `;
     }
 
-    // Let Leaflet know the container size changed and re-render tiles
+    // Let Leaflet know the container size changed
     if (map) {
       map.invalidateSize({ animate: false });
     }
+
+    // Center on subject property and zoom to fit all retailers
+    if (map && data) {
+      const propLatLng = [data.property.lat, data.property.lng];
+      const allPts = [
+        propLatLng,
+        ...data.retailers.map((r) => [r.lat, r.lng]),
+      ];
+      // Fit bounds with generous padding so logos aren't clipped at edges
+      map.fitBounds(allPts, {
+        padding: [60, 60],
+        maxZoom: 15,
+        animate: false,
+      });
+
+      // Nudge center toward subject property (weighted center: 60% property, 40% bounds center)
+      const boundsCenter = map.getCenter();
+      const weightedLat = propLatLng[0] * 0.6 + boundsCenter.lat * 0.4;
+      const weightedLng = propLatLng[1] * 0.6 + boundsCenter.lng * 0.4;
+      map.setView([weightedLat, weightedLng], map.getZoom(), { animate: false });
+    }
+
     // Wait for tiles to load and layout to settle
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 1000));
     if (map) {
       map.invalidateSize({ animate: false });
     }
+    // Extra settle for tile rendering
+    await new Promise((r) => setTimeout(r, 500));
 
     const fixed = fixObjectFitForExport(panel);
     try {
@@ -1184,12 +1228,15 @@ export default function App() {
       }
       hidden.forEach((el) => (el.style.display = ''));
       globalHidden.forEach((el) => (el.style.display = ''));
-      // Restore Leaflet to original size
+      // Restore original map view and size
       if (map) {
         map.invalidateSize({ animate: false });
+        if (origCenter && origZoom != null) {
+          map.setView(origCenter, origZoom, { animate: false });
+        }
       }
     }
-  }, []);
+  }, [data]);
 
   // Export map as high-res PNG (8.5×11 landscape)
   const handleExportImage = useCallback(async () => {

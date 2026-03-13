@@ -1014,56 +1014,79 @@ export default function App() {
     hidden.forEach((el) => (el.style.display = 'none'));
     globalHidden.forEach((el) => (el.style.display = 'none'));
 
-    // Save original panel styles
-    const origPosition = panel.style.position;
-    const origWidth = panel.style.width;
-    const origHeight = panel.style.height;
-    const origLeft = panel.style.left;
-    const origTop = panel.style.top;
-    const origZIndex = panel.style.zIndex;
-    const origFlex = panel.style.flex;
+    // Save original cssText so we can restore everything
+    const origCss = panel.style.cssText;
+    const origAppCss = panel.parentElement?.style.cssText || '';
 
-    // Force panel to landscape 11:8.5 aspect ratio (1100×850px capture area)
+    // Force panel to landscape 11:8.5 aspect ratio using !important to
+    // override any media-query rules (mobile sets width:100vw etc.)
     const CAPTURE_W = 1100;
     const CAPTURE_H = 850;
-    panel.style.position = 'fixed';
-    panel.style.left = '0';
-    panel.style.top = '0';
-    panel.style.width = CAPTURE_W + 'px';
-    panel.style.height = CAPTURE_H + 'px';
-    panel.style.zIndex = '-9999';
-    panel.style.flex = 'none';
+    panel.style.cssText = `
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: ${CAPTURE_W}px !important;
+      height: ${CAPTURE_H}px !important;
+      min-width: ${CAPTURE_W}px !important;
+      min-height: ${CAPTURE_H}px !important;
+      max-width: ${CAPTURE_W}px !important;
+      max-height: ${CAPTURE_H}px !important;
+      flex: none !important;
+      overflow: hidden !important;
+      z-index: 1 !important;
+    `;
+    // Also force the parent .app container so it doesn't constrain the panel
+    if (panel.parentElement) {
+      panel.parentElement.style.cssText = `
+        position: relative !important;
+        width: ${CAPTURE_W}px !important;
+        height: ${CAPTURE_H}px !important;
+        overflow: hidden !important;
+      `;
+    }
 
     // Let Leaflet know the container size changed and re-render tiles
     if (map) {
       map.invalidateSize({ animate: false });
     }
     // Wait for tiles to load and layout to settle
-    await new Promise((r) => setTimeout(r, 600));
+    await new Promise((r) => setTimeout(r, 800));
+    if (map) {
+      map.invalidateSize({ animate: false });
+    }
 
     const fixed = fixObjectFitForExport(panel);
     try {
       // Capture at 3× for 300 DPI quality (1100×3 = 3300, 850×3 = 2550)
-      const canvas = await html2canvas(panel, {
+      const rawCanvas = await html2canvas(panel, {
         width: CAPTURE_W,
         height: CAPTURE_H,
+        windowWidth: CAPTURE_W,
+        windowHeight: CAPTURE_H,
         scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
       });
 
-      return canvas;
+      // Guarantee output is exactly landscape letter at 300 DPI
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = EXPORT_W;   // 3300
+      outCanvas.height = EXPORT_H;  // 2550
+      const ctx = outCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
+      ctx.drawImage(rawCanvas, 0, 0, EXPORT_W, EXPORT_H);
+
+      return outCanvas;
     } finally {
       restoreObjectFit(fixed);
-      // Restore original panel styles
-      panel.style.position = origPosition;
-      panel.style.width = origWidth;
-      panel.style.height = origHeight;
-      panel.style.left = origLeft;
-      panel.style.top = origTop;
-      panel.style.zIndex = origZIndex;
-      panel.style.flex = origFlex;
+      // Restore original styles
+      panel.style.cssText = origCss;
+      if (panel.parentElement) {
+        panel.parentElement.style.cssText = origAppCss;
+      }
       hidden.forEach((el) => (el.style.display = ''));
       globalHidden.forEach((el) => (el.style.display = ''));
       // Restore Leaflet to original size

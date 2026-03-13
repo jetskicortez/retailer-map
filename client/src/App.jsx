@@ -329,7 +329,7 @@ function createLogoIcon(logoUrl) {
   const innerH = LOGO_H - 14;
 
   return L.divIcon({
-    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" style="width:${innerW}px;height:${innerH}px;object-fit:contain;background:#fff;" onerror="this.style.display='none'" /></div>`,
+    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" style="width:${innerW}px;height:${innerH}px;object-fit:contain;background:#fff;" onerror="this.parentElement.innerHTML=''" /></div>`,
     className: '',
     iconSize: [markerW, LOGO_H],
     iconAnchor: [markerW / 2, LOGO_H / 2],
@@ -337,51 +337,6 @@ function createLogoIcon(logoUrl) {
   });
 }
 
-// Get direction from displaced position to centroid
-function getPointerDirection(fromX, fromY, toX, toY) {
-  const dx = toX - fromX;
-  const dy = toY - fromY;
-  if (Math.abs(dx) > Math.abs(dy)) {
-    return dx > 0 ? 'right' : 'left';
-  }
-  return dy > 0 ? 'bottom' : 'top';
-}
-
-// Compute two base points on the edge of a box for the speech-bubble triangle
-// Returns { baseA: [lat,lng], baseB: [lat,lng] } — the two corners of the triangle base
-function getTriangleBase(map, markerLatLng, boxW, boxH, centroidLatLng) {
-  const mPt = map.latLngToContainerPoint(markerLatLng);
-  const cPt = map.latLngToContainerPoint(centroidLatLng);
-  const dir = getPointerDirection(mPt.x, mPt.y, cPt.x, cPt.y);
-  const baseSpread = 8; // half-width of triangle base in px
-
-  let ax, ay, bx, by;
-  if (dir === 'bottom') {
-    const cx = mPt.x;
-    const ey = mPt.y + boxH / 2; // bottom edge
-    ax = cx - baseSpread; ay = ey;
-    bx = cx + baseSpread; by = ey;
-  } else if (dir === 'top') {
-    const cx = mPt.x;
-    const ey = mPt.y - boxH / 2; // top edge
-    ax = cx - baseSpread; ay = ey;
-    bx = cx + baseSpread; by = ey;
-  } else if (dir === 'right') {
-    const cy = mPt.y;
-    const ex = mPt.x + boxW / 2; // right edge
-    ax = ex; ay = cy - baseSpread;
-    bx = ex; by = cy + baseSpread;
-  } else { // left
-    const cy = mPt.y;
-    const ex = mPt.x - boxW / 2; // left edge
-    ax = ex; ay = cy - baseSpread;
-    bx = ex; by = cy + baseSpread;
-  }
-
-  const aLL = map.containerPointToLatLng([ax, ay]);
-  const bLL = map.containerPointToLatLng([bx, by]);
-  return { baseA: [aLL.lat, aLL.lng], baseB: [bLL.lat, bLL.lng] };
-}
 
 // ── Smart Clustering + Collision-Avoidance System ────────────────
 // Groups overlapping markers into clusters, then displaces clusters/singles
@@ -404,8 +359,8 @@ function getClusterPadding(zoom) {
   return 28;                   // far out: merge aggressively
 }
 
-// Canvas renderer for connecting lines (html2canvas compatible)
-const canvasRenderer = L.canvas ? L.canvas({ padding: 0.5 }) : undefined;
+// SVG renderer for connecting lines (html2canvas captures SVG DOM elements reliably)
+const svgRenderer = L.svg ? L.svg({ padding: 0.5 }) : undefined;
 
 // ── Step 1: Group nearby markers into clusters (pixel space) ─────
 function buildClusters(map, items) {
@@ -515,7 +470,7 @@ function createClusterGridIcon(cluster, childrenData) {
     if (!child) return '<div class="sc-cell"></div>';
     const logoUrl = child.logoUrl;
     if (logoUrl) {
-      return `<div class="sc-cell"><img src="${logoUrl}" alt="" style="width:40px;height:40px;object-fit:contain;background:#fff;" onerror="this.style.display='none'" /></div>`;
+      return `<div class="sc-cell"><img src="${logoUrl}" alt="" style="width:40px;height:40px;object-fit:contain;background:#fff;" onerror="this.parentElement.innerHTML=''" /></div>`;
     }
     // No logo — show initials with category color background
     const cfg = getCategoryConfig(child.category || 'Other');
@@ -696,18 +651,12 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const dist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
         const isDisplaced = dist > 5;
 
-        let boxW, boxH;
-
         if (cluster.type === 'single') {
           const item = cluster.items[0];
           const child = children.find((c) => c && c.idx === item.idx);
           if (!child) return;
 
-          const icon = child.icon;
-          boxW = icon.options.iconSize[0];
-          boxH = icon.options.iconSize[1];
-
-          const marker = L.marker(markerLatLng, { icon, draggable: true });
+          const marker = L.marker(markerLatLng, { icon: child.icon, draggable: true });
           if (child.popup) marker.bindPopup(child.popup);
           marker.on('click', () => {
             if (onMarkerClick) onMarkerClick(item.idx);
@@ -723,9 +672,6 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           layers.addLayer(marker);
         } else {
           const icon = createClusterGridIcon(cluster, children);
-          boxW = cluster.gridW;
-          boxH = cluster.gridH;
-
           const marker = L.marker(markerLatLng, { icon, draggable: true });
 
           const names = cluster.items.map((item) => {
@@ -756,27 +702,33 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           layers.addLayer(marker);
         }
 
-        // Draw speech-bubble triangle tail from box edge to actual map location
+        // Draw clean connector line from marker to actual map location
         if (isDisplaced) {
-          const { baseA, baseB } = getTriangleBase(
-            map, markerLatLng, boxW, boxH, cluster.centroidLatLng
-          );
-          const tipLatLng = cluster.centroidLatLng;
-
-          const triangle = L.polygon(
-            [baseA, baseB, tipLatLng],
+          const line = L.polyline(
+            [markerLatLng, cluster.centroidLatLng],
             {
-              fillColor: '#ffffff',
-              fillOpacity: 0.92,
-              color: '#888888',
               weight: 1.5,
-              opacity: 0.8,
+              color: '#666666',
+              opacity: 0.6,
+              dashArray: '6 4',
               interactive: false,
-              renderer: canvasRenderer,
+              renderer: svgRenderer,
             }
           );
-          // Draw triangle BEHIND markers
-          lines.addLayer(triangle);
+          lines.addLayer(line);
+
+          // Small anchor dot at the actual location
+          const dot = L.circleMarker(cluster.centroidLatLng, {
+            radius: 4,
+            fillColor: '#666666',
+            fillOpacity: 0.7,
+            stroke: true,
+            color: '#ffffff',
+            weight: 1.5,
+            interactive: false,
+            renderer: svgRenderer,
+          });
+          lines.addLayer(dot);
         }
       });
     }

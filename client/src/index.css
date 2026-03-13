@@ -637,8 +637,6 @@ body {
 
 /* ---- Logo Markers ---- */
 .logo-marker {
-  width: 52px;
-  height: 52px;
   border-radius: 8px;
   background: #ffffff !important;
   border: 2px solid #888888;
@@ -646,14 +644,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   padding: 5px;
   cursor: grab;
-}
-
-.logo-marker.logo-wide {
-  width: 90px;
-  padding: 6px;
 }
 
 .logo-marker img {
@@ -722,13 +715,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid #e0ddd8;
 }
 
 .sc-cell img {
-  width: 36px;
-  height: 36px;
+  max-width: 40px;
+  max-height: 40px;
   object-fit: contain;
   display: block;
 }

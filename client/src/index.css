@@ -637,15 +637,15 @@ body {
 
 /* ---- Logo Markers ---- */
 .logo-marker {
-  border-radius: 8px;
+  border-radius: 10px;
   background: #ffffff !important;
-  border: 2px solid #888888;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid #c0c0c0;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0,0,0,0.04);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 5px;
+  padding: 6px;
   cursor: grab;
 }
 
@@ -656,6 +656,7 @@ body {
   display: block;
   pointer-events: none;
   background: #ffffff;
+  border-radius: 3px;
 }
 
 /* Let touch events pass through to Leaflet's drag handler */
@@ -684,39 +685,40 @@ body {
 /* ---- Smart Cluster Grid Icons ---- */
 .smart-cluster {
   display: grid;
-  gap: 3px;
-  padding: 6px;
+  gap: 4px;
+  padding: 7px;
   background: #ffffff !important;
-  border: 2px solid #888888;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid #c0c0c0;
+  border-radius: 10px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0,0,0,0.04);
   position: relative;
   cursor: grab;
 }
 
 .smart-cluster:hover {
-  border-color: #666666;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  border-color: #999999;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
 .sc-cell {
   width: 44px;
   height: 44px;
   background: #ffffff !important;
-  border-radius: 4px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border: 1px solid #e0ddd8;
+  border: 1px solid #e8e8e8;
 }
 
 .sc-cell img {
-  max-width: 40px;
-  max-height: 40px;
+  max-width: 38px;
+  max-height: 38px;
   object-fit: contain;
   display: block;
   background: #ffffff;
+  border-radius: 2px;
 }
 
 .sc-cell-text {
@@ -727,22 +729,22 @@ body {
 
 .sc-count {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 10px;
-  background: #555555;
+  top: -7px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #666666;
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   font-family: 'DM Sans', sans-serif;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   border: 1.5px solid #fff;
   pointer-events: auto;
 }

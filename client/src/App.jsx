@@ -229,8 +229,8 @@ const LOGO_FILES = {
   'sherwin williams': 'Sherwin-Williams.png',
   'salvation army': 'Salvation Army.png',
   'the salvation army': 'Salvation Army.png',
-  'true value': 'True Value.svg',
-  'true value of latrobe': 'True Value.svg',
+  'true value': 'True Value.png',
+  'true value of latrobe': 'True Value.png',
   "fox's pizza den": 'Foxs Pizza.png',
   'foxs pizza den': 'Foxs Pizza.png',
   "fox's pizza": 'Foxs Pizza.png',
@@ -672,7 +672,7 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
 }
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
-function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng }) {
+function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef }) {
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
@@ -707,8 +707,12 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       layers.clearLayers();
       lines.clearLayers();
       if (markerRefs) markerRefs.current = {};
+      const connectors = []; // collect connector line data for export
 
-      if (!Array.isArray(children) || children.length === 0 || !propertyLatLng) return;
+      if (!Array.isArray(children) || children.length === 0 || !propertyLatLng) {
+        if (connectorDataRef) connectorDataRef.current = [];
+        return;
+      }
 
       const propLL = L.latLng(propertyLatLng[0], propertyLatLng[1]);
 
@@ -793,7 +797,13 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
         // Draw connector line from marker to actual map location
         if (isDisplaced) {
-          // Solid thin line
+          // Store data for canvas-based export drawing
+          connectors.push({
+            from: Array.isArray(markerLatLng) ? markerLatLng : [markerLatLng.lat, markerLatLng.lng],
+            to: Array.isArray(cluster.centroidLatLng) ? cluster.centroidLatLng : [cluster.centroidLatLng.lat, cluster.centroidLatLng.lng],
+          });
+
+          // Solid thin line (visible on screen via SVG renderer)
           const line = L.polyline(
             [markerLatLng, cluster.centroidLatLng],
             {
@@ -820,6 +830,9 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           lines.addLayer(dot);
         }
       });
+
+      // Expose connector data for canvas-based export drawing
+      if (connectorDataRef) connectorDataRef.current = connectors;
     }
 
     render();
@@ -949,6 +962,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const markerRefs = useRef({});
+  const connectorDataRef = useRef([]);
   const cardRefs = useRef({});
   const mapRef = useRef(null);
   const mapPanelRef = useRef(null);
@@ -1290,6 +1304,36 @@ export default function App() {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
       ctx.drawImage(rawCanvas, 0, 0, EXPORT_W, EXPORT_H);
+
+      // Draw connector lines directly on canvas (html2canvas can't capture Leaflet SVG overlay)
+      if (map && connectorDataRef.current.length > 0) {
+        const scaleX = EXPORT_W / CAPTURE_W;
+        const scaleY = EXPORT_H / CAPTURE_H;
+        connectorDataRef.current.forEach(({ from, to }) => {
+          const fromPt = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
+          const toPt = map.latLngToContainerPoint(L.latLng(to[0], to[1]));
+          const x1 = fromPt.x * scaleX, y1 = fromPt.y * scaleY;
+          const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
+
+          // Thin solid line
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = 'rgba(153, 153, 153, 0.5)';
+          ctx.lineWidth = 1.2 * scaleX;
+          ctx.stroke();
+
+          // Filled dot at the actual location
+          const dotR = 3.5 * scaleX;
+          ctx.beginPath();
+          ctx.arc(x2, y2, dotR, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(136, 136, 136, 0.8)';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5 * scaleX;
+          ctx.stroke();
+        });
+      }
 
       return outCanvas;
     } finally {
@@ -1641,6 +1685,7 @@ export default function App() {
             onMarkerClick={handleMarkerClick}
             markerRefs={markerRefs}
             propertyLatLng={data ? [data.property.lat, data.property.lng] : null}
+            connectorDataRef={connectorDataRef}
           >
             {data?.retailers.map((r, i) => {
               if (!filteredRetailers.includes(r)) return null;

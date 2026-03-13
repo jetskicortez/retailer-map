@@ -288,8 +288,8 @@ function getLogoUrl(retailerName) {
   return null;
 }
 
-const LOGO_SIZE = 44; // Uniform height for all logo markers
-const WIDE_LOGO_W = 80; // wider container for landscape logos
+const LOGO_SIZE = 52; // Uniform height for all logo markers
+const WIDE_LOGO_W = 90; // wider container for landscape logos
 
 // Logos with aspect ratio > 2.2:1 — computed from actual image files
 const WIDE_LOGOS = new Set([
@@ -314,11 +314,9 @@ function isWideLogo(logoUrl) {
 function createLogoIcon(logoUrl) {
   const isWide = isWideLogo(logoUrl);
   const markerW = isWide ? WIDE_LOGO_W : LOGO_SIZE;
-  const imgW = markerW - 10;
-  const imgH = LOGO_SIZE - 10;
 
   return L.divIcon({
-    html: `<div class="logo-marker${isWide ? ' logo-wide' : ''}"><img src="${logoUrl}" alt="" style="width:${imgW}px;height:${imgH}px;object-fit:contain;" /></div>`,
+    html: `<div class="logo-marker${isWide ? ' logo-wide' : ''}"><img src="${logoUrl}" alt="" /></div>`,
     className: '',
     iconSize: [markerW, LOGO_SIZE],
     iconAnchor: [markerW / 2, LOGO_SIZE / 2],
@@ -326,14 +324,99 @@ function createLogoIcon(logoUrl) {
   });
 }
 
+// Create a callout-style logo icon with speech-bubble tail pointing toward centroid
+function createCalloutLogoIcon(logoUrl, pointerDir) {
+  const isWide = isWideLogo(logoUrl);
+  const markerW = isWide ? WIDE_LOGO_W : LOGO_SIZE;
+  const tailH = CALLOUT_TAIL;
+
+  const tailSvg = getCalloutTailSvg(pointerDir, markerW, LOGO_SIZE, tailH);
+
+  // Extra space for the tail
+  const extraW = (pointerDir === 'left' || pointerDir === 'right') ? tailH : 0;
+  const extraH = (pointerDir === 'top' || pointerDir === 'bottom') ? tailH : 0;
+  const totalW = markerW + extraW;
+  const totalH = LOGO_SIZE + extraH;
+
+  // Position the box within the larger container
+  const boxLeft = pointerDir === 'left' ? tailH : 0;
+  const boxTop = pointerDir === 'top' ? tailH : 0;
+
+  const html = `<div class="callout-wrap" style="width:${totalW}px;height:${totalH}px;position:relative;">
+    <div class="logo-marker${isWide ? ' logo-wide' : ''}" style="position:absolute;left:${boxLeft}px;top:${boxTop}px;">
+      <img src="${logoUrl}" alt="" />
+    </div>
+    ${tailSvg}
+  </div>`;
+
+  // Anchor at center of the box (not the tail)
+  const anchorX = boxLeft + markerW / 2;
+  const anchorY = boxTop + LOGO_SIZE / 2;
+
+  return L.divIcon({
+    html,
+    className: '',
+    iconSize: [totalW, totalH],
+    iconAnchor: [anchorX, anchorY],
+    popupAnchor: [0, -anchorY],
+  });
+}
+
+// Get direction from displaced position to centroid
+function getPointerDirection(fromX, fromY, toX, toY) {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0 ? 'right' : 'left';
+  }
+  return dy > 0 ? 'bottom' : 'top';
+}
+
+// Generate SVG tail for callout bubble pointing in given direction
+function getCalloutTailSvg(dir, boxW, boxH, tailLen) {
+  const tailW = 16; // width of triangle base
+  const borderColor = '#888888';
+  const fillColor = '#ffffff';
+  const sw = 2; // stroke width
+
+  if (dir === 'bottom') {
+    const cx = boxW / 2;
+    return `<svg style="position:absolute;left:${cx - tailW / 2}px;top:${boxH - 1}px;" width="${tailW}" height="${tailLen}" viewBox="0 0 ${tailW} ${tailLen}" fill="none">
+      <polygon points="0,0 ${tailW},0 ${tailW / 2},${tailLen}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
+      <rect x="0" y="0" width="${tailW}" height="${sw + 1}" fill="${fillColor}"/>
+    </svg>`;
+  }
+  if (dir === 'top') {
+    const cx = boxW / 2;
+    return `<svg style="position:absolute;left:${cx - tailW / 2}px;top:${-tailLen + 1}px;" width="${tailW}" height="${tailLen}" viewBox="0 0 ${tailW} ${tailLen}" fill="none">
+      <polygon points="0,${tailLen} ${tailW},${tailLen} ${tailW / 2},0" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
+      <rect x="0" y="${tailLen - sw - 1}" width="${tailW}" height="${sw + 1}" fill="${fillColor}"/>
+    </svg>`;
+  }
+  if (dir === 'right') {
+    const cy = boxH / 2;
+    return `<svg style="position:absolute;left:${boxW - 1}px;top:${cy - tailW / 2}px;" width="${tailLen}" height="${tailW}" viewBox="0 0 ${tailLen} ${tailW}" fill="none">
+      <polygon points="0,0 0,${tailW} ${tailLen},${tailW / 2}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
+      <rect x="0" y="0" width="${sw + 1}" height="${tailW}" fill="${fillColor}"/>
+    </svg>`;
+  }
+  // left
+  const cy = boxH / 2;
+  return `<svg style="position:absolute;left:${-tailLen + 1}px;top:${cy - tailW / 2}px;" width="${tailLen}" height="${tailW}" viewBox="0 0 ${tailLen} ${tailW}" fill="none">
+    <polygon points="${tailLen},0 ${tailLen},${tailW} 0,${tailW / 2}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}" stroke-linejoin="round"/>
+    <rect x="${tailLen - sw - 1}" y="0" width="${sw + 1}" height="${tailW}" fill="${fillColor}"/>
+  </svg>`;
+}
+
 // ── Smart Clustering + Collision-Avoidance System ────────────────
 // Groups overlapping markers into clusters, then displaces clusters/singles
 // so the subject property is never blocked and the map stays clean.
 
 const MARKER_PAD = 8;
-const CLUSTER_CELL = 32;       // px per logo cell inside cluster grid
-const CLUSTER_GAP = 2;         // px gap between cells
-const CLUSTER_PAD = 5;         // px padding inside cluster border
+const CLUSTER_CELL = 44;       // px per logo cell inside cluster grid
+const CLUSTER_GAP = 3;         // px gap between cells
+const CLUSTER_PAD = 6;         // px padding inside cluster border
+const CALLOUT_TAIL = 14;       // px length of speech-bubble tail
 const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
 const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
 const MIN_CLUSTER_SIZE = 3;    // minimum items to form a cluster (pairs just push apart)
@@ -451,7 +534,7 @@ function buildClusters(map, items) {
 }
 
 // ── Step 2: Create a cluster divIcon showing a mini logo grid ────
-function createClusterGridIcon(cluster, childrenData) {
+function createClusterGridIcon(cluster, childrenData, pointerDir) {
   const { items, cols, gridW, gridH } = cluster;
   const cells = items.map((item) => {
     const child = childrenData.find((c) => c && c.idx === item.idx);
@@ -466,12 +549,43 @@ function createClusterGridIcon(cluster, childrenData) {
     return `<div class="sc-cell sc-cell-text" style="background:${cfg.color}33;color:${cfg.color}">${initials}</div>`;
   }).join('');
 
+  const clusterHtml = `<div class="smart-cluster" style="width:${gridW}px;height:${gridH}px;grid-template-columns:repeat(${cols},${CLUSTER_CELL}px);">${cells}<div class="sc-count">${items.length}</div></div>`;
+
+  // If no pointer needed, render plain cluster
+  if (!pointerDir) {
+    return L.divIcon({
+      html: clusterHtml,
+      className: '',
+      iconSize: [gridW, gridH],
+      iconAnchor: [gridW / 2, gridH / 2],
+      popupAnchor: [0, -gridH / 2],
+    });
+  }
+
+  // Wrap in callout with speech-bubble tail
+  const tailH = CALLOUT_TAIL;
+  const tailSvg = getCalloutTailSvg(pointerDir, gridW, gridH, tailH);
+  const extraW = (pointerDir === 'left' || pointerDir === 'right') ? tailH : 0;
+  const extraH = (pointerDir === 'top' || pointerDir === 'bottom') ? tailH : 0;
+  const totalW = gridW + extraW;
+  const totalH = gridH + extraH;
+  const boxLeft = pointerDir === 'left' ? tailH : 0;
+  const boxTop = pointerDir === 'top' ? tailH : 0;
+
+  const html = `<div class="callout-wrap" style="width:${totalW}px;height:${totalH}px;position:relative;">
+    <div class="smart-cluster" style="position:absolute;left:${boxLeft}px;top:${boxTop}px;width:${gridW}px;height:${gridH}px;grid-template-columns:repeat(${cols},${CLUSTER_CELL}px);">${cells}<div class="sc-count">${items.length}</div></div>
+    ${tailSvg}
+  </div>`;
+
+  const anchorX = boxLeft + gridW / 2;
+  const anchorY = boxTop + gridH / 2;
+
   return L.divIcon({
-    html: `<div class="smart-cluster" style="width:${gridW}px;height:${gridH}px;grid-template-columns:repeat(${cols},${CLUSTER_CELL}px);">${cells}<div class="sc-count">${items.length}</div></div>`,
+    html,
     className: '',
-    iconSize: [gridW, gridH],
-    iconAnchor: [gridW / 2, gridH / 2],
-    popupAnchor: [0, -gridH / 2],
+    iconSize: [totalW, totalH],
+    iconAnchor: [anchorX, anchorY],
+    popupAnchor: [0, -anchorY],
   });
 }
 
@@ -624,51 +738,56 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       // Step 2: Displace clusters to avoid subject property + each other
       const displaced = displaceClusterRects(map, clusters, propLL);
 
-      // Step 3: Render each cluster or single marker
+      // Step 3: Render each cluster or single marker with speech-bubble callouts
       clusters.forEach((cluster, ci) => {
         const dp = displaced[ci];
         if (!dp) return;
 
         const clusterKey = getClusterKey(cluster);
-        // Use drag override position if user has repositioned this marker
         const overridePos = dragOverrides.current[clusterKey];
         const markerLatLng = overridePos || dp.displacedLatLng;
 
+        // Determine if displaced and which direction the tail should point
+        const finalPt = map.latLngToContainerPoint(markerLatLng);
+        const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
+        const dist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
+        const isDisplaced = dist > 5;
+        const pointerDir = isDisplaced
+          ? getPointerDirection(finalPt.x, finalPt.y, origPt.x, origPt.y)
+          : null;
+
         if (cluster.type === 'single') {
-          // Render single marker at displaced (or overridden) position
           const item = cluster.items[0];
           const child = children.find((c) => c && c.idx === item.idx);
           if (!child) return;
 
-          const marker = L.marker(markerLatLng, {
-            icon: child.icon,
-            draggable: true,
-          });
+          // Use callout icon if displaced, otherwise regular icon
+          let icon;
+          if (isDisplaced && child.logoUrl) {
+            icon = createCalloutLogoIcon(child.logoUrl, pointerDir);
+          } else {
+            icon = child.icon;
+          }
+
+          const marker = L.marker(markerLatLng, { icon, draggable: true });
           if (child.popup) marker.bindPopup(child.popup);
           marker.on('click', () => {
             if (onMarkerClick) onMarkerClick(item.idx);
           });
-          marker.on('dragstart', () => {
-            justDragged.current = true;
-          });
+          marker.on('dragstart', () => { justDragged.current = true; });
           marker.on('dragend', (e) => {
             const pos = e.target.getLatLng();
             dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
-            // Re-draw connecting lines after drag
             justDragged.current = true;
             render();
           });
           if (markerRefs) markerRefs.current[`r-${item.idx}`] = marker;
           layers.addLayer(marker);
         } else {
-          // Render cluster icon at displaced (or overridden) position
-          const icon = createClusterGridIcon(cluster, children);
-          const marker = L.marker(markerLatLng, {
-            icon,
-            draggable: true,
-          });
+          // Cluster with callout tail
+          const icon = createClusterGridIcon(cluster, children, pointerDir);
+          const marker = L.marker(markerLatLng, { icon, draggable: true });
 
-          // Build cluster popup listing all retailers
           const names = cluster.items.map((item) => {
             const child = children.find((c) => c && c.idx === item.idx);
             return child?.name || '';
@@ -678,16 +797,12 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
             names.map((n) => `<div class="popup-address">${n}</div>`).join('')
           );
 
-          // Click handler — click opens popup; individual items reachable via sidebar
           marker.on('click', () => {
-            // Highlight first item in cluster
             if (cluster.items.length > 0 && onMarkerClick) {
               onMarkerClick(cluster.items[0].idx);
             }
           });
-          marker.on('dragstart', () => {
-            justDragged.current = true;
-          });
+          marker.on('dragstart', () => { justDragged.current = true; });
           marker.on('dragend', (e) => {
             const pos = e.target.getLatLng();
             dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
@@ -695,62 +810,25 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
             render();
           });
 
-          // Store ref for all items in this cluster
           cluster.items.forEach((item) => {
             if (markerRefs) markerRefs.current[`r-${item.idx}`] = marker;
           });
           layers.addLayer(marker);
         }
 
-        // Draw arrow connector from marker to true centroid location
-        const finalLatLng = overridePos || dp.displacedLatLng;
-        const origLatLng = cluster.centroidLatLng;
-        const finalPt = map.latLngToContainerPoint(finalLatLng);
-        const origPt = map.latLngToContainerPoint(origLatLng);
-        const lineDist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
-
-        if (lineDist > 3) {
-          // Solid connector line
+        // Draw thin connector line from callout to actual location (behind the tail)
+        if (isDisplaced) {
           const line = L.polyline(
-            [finalLatLng, origLatLng],
+            [markerLatLng, cluster.centroidLatLng],
             {
               weight: 1.5,
-              color: '#555555',
-              opacity: 0.7,
+              color: '#888888',
+              opacity: 0.5,
               interactive: false,
               renderer: canvasRenderer,
             }
           );
           lines.addLayer(line);
-
-          // Arrowhead at the centroid end (pointing to actual location)
-          const dx = origPt.x - finalPt.x;
-          const dy = origPt.y - finalPt.y;
-          const angle = Math.atan2(dy, dx);
-          const arrowLen = 8;
-          const arrowSpread = Math.PI / 6; // 30 degrees
-          const tipX = origPt.x;
-          const tipY = origPt.y;
-          const leftX = tipX - arrowLen * Math.cos(angle - arrowSpread);
-          const leftY = tipY - arrowLen * Math.sin(angle - arrowSpread);
-          const rightX = tipX - arrowLen * Math.cos(angle + arrowSpread);
-          const rightY = tipY - arrowLen * Math.sin(angle + arrowSpread);
-          const tipLL = map.containerPointToLatLng([tipX, tipY]);
-          const leftLL = map.containerPointToLatLng([leftX, leftY]);
-          const rightLL = map.containerPointToLatLng([rightX, rightY]);
-
-          // Arrow wings
-          const arrow = L.polyline(
-            [[leftLL.lat, leftLL.lng], [tipLL.lat, tipLL.lng], [rightLL.lat, rightLL.lng]],
-            {
-              weight: 2,
-              color: '#555555',
-              opacity: 0.7,
-              interactive: false,
-              renderer: canvasRenderer,
-            }
-          );
-          lines.addLayer(arrow);
         }
       });
     }
@@ -1075,8 +1153,8 @@ export default function App() {
     const originals = [];
     imgs.forEach((img) => {
       if (!img.naturalWidth || !img.naturalHeight) return;
-      const boxW = img.clientWidth || parseInt(img.style.width) || 34;
-      const boxH = img.clientHeight || parseInt(img.style.height) || 34;
+      const boxW = img.clientWidth || parseInt(img.style.width) || 36;
+      const boxH = img.clientHeight || parseInt(img.style.height) || 36;
       const imgRatio = img.naturalWidth / img.naturalHeight;
       const boxRatio = boxW / boxH;
       let drawW, drawH;

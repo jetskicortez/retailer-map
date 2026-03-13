@@ -273,6 +273,95 @@ const LOGO_FILES = {
   "popeyes": 'Popeyes.png',
   "popeye's": 'Popeyes.png',
   'popeyes louisiana kitchen': 'Popeyes.png',
+  // ── Additional unmapped brands ──
+  'autozone': 'AutoZone.png',
+  'auto zone': 'AutoZone.png',
+  'pet supplies plus': 'Pet Supplies Plus.png',
+  'speedway': 'Speedway.png',
+  'valvoline': 'Valvoline.png',
+  'valvoline instant oil change': 'Valvoline.png',
+  'citizens bank': 'Citizens Bank.png',
+  'citizens': 'Citizens Bank.png',
+  'family dollar / dollar tree': 'Family Dollar Dollar Tree.png',
+  'family dollar/dollar tree': 'Family Dollar Dollar Tree.png',
+  // Hotels & lodging
+  'best western plus': 'Best Western Plus.png',
+  'best western': 'Best Western Plus.png',
+  'cambria hotels': 'Cambria Hotels.png',
+  'cambria hotel': 'Cambria Hotels.png',
+  'candlewood suites': 'Candlewood Suites.png',
+  'clarion inn': 'Clarion Inn.png',
+  'comfort inn': 'Comfort Inn.png',
+  'comfort inn & suites': 'Comfort Inn.png',
+  'courtyard by marriott': 'Courtyard by Marriott.png',
+  'courtyard marriott': 'Courtyard by Marriott.png',
+  'doubletree by hilton': 'DoubleTree by Hilton.png',
+  'doubletree': 'DoubleTree by Hilton.png',
+  'even hotel': 'Even Hotel.png',
+  'extended stay america': 'Extended Stay America Select Suites.png',
+  'extended stay america select suites': 'Extended Stay America Select Suites.png',
+  'hampton inn & suites': 'Hampton Inn & Suites.png',
+  'hampton inn': 'Hampton Inn & Suites.png',
+  'hilton garden inn': 'Hilton Garden Inn.png',
+  'home2 suites by hilton': 'Home2 Suites by Hilton.png',
+  'home2 suites': 'Home2 Suites by Hilton.png',
+  'marriott': 'Marriott.png',
+  'omni hotel': 'Omni Hotel.png',
+  'omni': 'Omni Hotel.png',
+  'premier suites': 'Premier Suites.png',
+  'quality inn': 'Quality Inn.png',
+  'quality inn & suites': 'Quality Inn.png',
+  'red roof inn': 'Red Roof Inn.png',
+  'residence inn by marriott': 'Residence Inn by Marriott.png',
+  'residence inn': 'Residence Inn by Marriott.png',
+  'staybridge suites': 'Staybridge Suites.png',
+  'towneplace suites by marriott': 'TownePlace Suites by Marriott.png',
+  'towneplace suites': 'TownePlace Suites by Marriott.png',
+  'wingate by wyndham': 'Wingate by Wyndham.png',
+  // Local/regional restaurants & businesses
+  'bravo cucina italiana': 'Bravo Cucina Italiana.png',
+  'bravo': 'Bravo Cucina Italiana.png',
+  'brighton hot dog shoppe': 'Brighton Hot Dog Shoppe.png',
+  'burgatory': 'Burgatory.png',
+  'busy beaver': 'Busy Beaver.png',
+  'busy beaver building centers': 'Busy Beaver.png',
+  'china wok': 'China Wok.png',
+  'commonplace coffee': 'Commonplace Coffee.png',
+  'duquesne university': 'Duquesne University.png',
+  'fnb financial center': 'FNB Financial Center.png',
+  'fnb': 'FNB Financial Center.png',
+  'first national bank financial center': 'FNB Financial Center.png',
+  'hofbrauhaus': 'Hofbrauhaus.png',
+  'hofbrauhaus pittsburgh': 'Hofbrauhaus.png',
+  "jason's deli": 'Jasons Deli.png',
+  'jasons deli': 'Jasons Deli.png',
+  "jeni's ice cream": 'Jenis Ice Cream.png',
+  "jeni's splendid ice creams": 'Jenis Ice Cream.png',
+  'jenis ice cream': 'Jenis Ice Cream.png',
+  'juniper grill': 'Juniper Grill.png',
+  'kura sushi': 'Kura Sushi.png',
+  'mad mex': 'Mad Mex.png',
+  'nextier bank': 'NexTier Bank.png',
+  'over the bar': 'Over the Bar.png',
+  'over the bar bicycle cafe': 'Over the Bar.png',
+  'ppg paints arena': 'PPG Paints Arena.png',
+  'patron mexican grill': 'Patron Mexican Grill.png',
+  'pins mechanical': 'Pins Mechanical.png',
+  'pins mechanical co': 'Pins Mechanical.png',
+  'pizza bosa': 'Pizza Bosa.png',
+  "pizza joe's": 'Pizza Joes.png',
+  'pizza joes': 'Pizza Joes.png',
+  'pizza milano': 'Pizza Milano.png',
+  'saga hibachi': 'Saga Hibachi.png',
+  'sakura japanese steakhouse': 'Sakura Japanese Steakhouse.png',
+  'sakura': 'Sakura Japanese Steakhouse.png',
+  "salem's": 'Salems.png',
+  'salems': 'Salems.png',
+  "salem's market": 'Salems.png',
+  'speckled egg': 'Speckled Egg.png',
+  'the speckled egg': 'Speckled Egg.png',
+  'tepache': 'Tepache.png',
+  'waffles incaffeinated': 'Waffles INCaffeinated.png',
 };
 
 function getLogoUrl(retailerName) {
@@ -317,19 +406,19 @@ function getLogoMarkerW(logoUrl) {
   const cached = logoDimCache[logoUrl];
   if (!cached) return LOGO_MIN_W;
   // Scale width to maintain aspect ratio at fixed height
-  const innerH = LOGO_H - 14; // padding + border overhead
-  const naturalW = innerH * cached.aspect + 14; // add back padding + border
+  const innerH = LOGO_H - 15; // padding (6px×2) + border (1.5px×2) overhead
+  const naturalW = innerH * cached.aspect + 15; // add back padding + border
   return Math.max(LOGO_MIN_W, Math.min(LOGO_MAX_W, Math.round(naturalW)));
 }
 
 function createLogoIcon(logoUrl) {
   const markerW = getLogoMarkerW(logoUrl);
-  // Inner dimensions after padding (5px) and border (2px) on each side
-  const innerW = markerW - 14;
-  const innerH = LOGO_H - 14;
+  // Inner dimensions after padding (6px) and border (1.5px) on each side
+  const innerW = markerW - 15;
+  const innerH = LOGO_H - 15;
 
   return L.divIcon({
-    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" style="width:${innerW}px;height:${innerH}px;object-fit:contain;background:#fff;" onerror="this.parentElement.innerHTML=''" /></div>`,
+    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="this.style.display='none'" /></div>`,
     className: '',
     iconSize: [markerW, LOGO_H],
     iconAnchor: [markerW / 2, LOGO_H / 2],
@@ -344,8 +433,8 @@ function createLogoIcon(logoUrl) {
 
 const MARKER_PAD = 8;
 const CLUSTER_CELL = 44;       // px per logo cell inside cluster grid
-const CLUSTER_GAP = 3;         // px gap between cells
-const CLUSTER_PAD = 6;         // px padding inside cluster border
+const CLUSTER_GAP = 4;         // px gap between cells
+const CLUSTER_PAD = 7;         // px padding inside cluster border
 const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
 const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
 const MIN_CLUSTER_SIZE = 3;    // minimum items to form a cluster (pairs just push apart)
@@ -470,7 +559,7 @@ function createClusterGridIcon(cluster, childrenData) {
     if (!child) return '<div class="sc-cell"></div>';
     const logoUrl = child.logoUrl;
     if (logoUrl) {
-      return `<div class="sc-cell"><img src="${logoUrl}" alt="" style="width:40px;height:40px;object-fit:contain;background:#fff;" onerror="this.parentElement.innerHTML=''" /></div>`;
+      return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="38" height="38" style="object-fit:contain;" onerror="this.style.display='none'" /></div>`;
     }
     // No logo — show initials with category color background
     const cfg = getCategoryConfig(child.category || 'Other');
@@ -702,26 +791,26 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           layers.addLayer(marker);
         }
 
-        // Draw clean connector line from marker to actual map location
+        // Draw connector line from marker to actual map location
         if (isDisplaced) {
+          // Solid thin line
           const line = L.polyline(
             [markerLatLng, cluster.centroidLatLng],
             {
-              weight: 1.5,
-              color: '#666666',
-              opacity: 0.6,
-              dashArray: '6 4',
+              weight: 1.2,
+              color: '#999999',
+              opacity: 0.5,
               interactive: false,
               renderer: svgRenderer,
             }
           );
           lines.addLayer(line);
 
-          // Small anchor dot at the actual location
+          // Small filled dot at the actual location
           const dot = L.circleMarker(cluster.centroidLatLng, {
-            radius: 4,
-            fillColor: '#666666',
-            fillOpacity: 0.7,
+            radius: 3.5,
+            fillColor: '#888888',
+            fillOpacity: 0.8,
             stroke: true,
             color: '#ffffff',
             weight: 1.5,

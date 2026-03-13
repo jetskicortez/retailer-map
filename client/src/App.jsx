@@ -330,19 +330,21 @@ function createLogoIcon(logoUrl) {
 // Groups overlapping markers into clusters, then displaces clusters/singles
 // so the subject property is never blocked and the map stays clean.
 
-const MARKER_PAD = 6;
+const MARKER_PAD = 8;
 const CLUSTER_CELL = 32;       // px per logo cell inside cluster grid
 const CLUSTER_GAP = 2;         // px gap between cells
 const CLUSTER_PAD = 5;         // px padding inside cluster border
 const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
 const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
+const MIN_CLUSTER_SIZE = 3;    // minimum items to form a cluster (pairs just push apart)
 
-// Zoom-adaptive merge distance: merge more at low zoom, less at high zoom
-function getClusterMergeDist(zoom) {
-  if (zoom >= 16) return 25;  // very close: barely cluster
-  if (zoom >= 14) return 35;  // medium-close
-  if (zoom >= 12) return 48;  // medium
-  return 60;                  // zoomed out: cluster aggressively
+// Zoom-adaptive extra padding for merge detection:
+// At low zoom we pad more so distant markers merge sooner
+function getClusterPadding(zoom) {
+  if (zoom >= 16) return 4;   // tight: only merge if truly overlapping
+  if (zoom >= 14) return 10;
+  if (zoom >= 12) return 18;
+  return 28;                   // far out: merge aggressively
 }
 
 // Canvas renderer for connecting lines (html2canvas compatible)
@@ -351,12 +353,14 @@ const canvasRenderer = L.canvas ? L.canvas({ padding: 0.5 }) : undefined;
 // ── Step 1: Group nearby markers into clusters (pixel space) ─────
 function buildClusters(map, items) {
   const zoom = map.getZoom();
-  const mergeDist = getClusterMergeDist(zoom);
+  const pad = getClusterPadding(zoom);
 
-  // Convert to pixel positions
+  // Convert to pixel positions with bounding box sizes
   const nodes = items.map((item, i) => {
     const pt = map.latLngToContainerPoint(item.position);
-    return { ...item, px: pt.x, py: pt.y, clusterId: i };
+    const w = (item.wide ? WIDE_LOGO_W : LOGO_SIZE) + MARKER_PAD;
+    const h = LOGO_SIZE + MARKER_PAD;
+    return { ...item, px: pt.x, py: pt.y, w, h, clusterId: i };
   });
 
   // Union-find for merging
@@ -367,11 +371,13 @@ function buildClusters(map, items) {
   }
   function union(a, b) { parent[find(a)] = find(b); }
 
-  // Merge nodes that are within mergeDist px of each other
+  // Merge nodes whose bounding boxes overlap (+ zoom-adaptive padding)
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      const dist = Math.hypot(nodes[i].px - nodes[j].px, nodes[i].py - nodes[j].py);
-      if (dist < mergeDist) {
+      const ni = nodes[i], nj = nodes[j];
+      const overlapX = (ni.w + nj.w) / 2 + pad - Math.abs(ni.px - nj.px);
+      const overlapY = (ni.h + nj.h) / 2 + pad - Math.abs(ni.py - nj.py);
+      if (overlapX > 0 && overlapY > 0) {
         union(i, j);
       }
     }
@@ -386,38 +392,42 @@ function buildClusters(map, items) {
   });
 
   // Split oversized clusters into smaller chunks
+  // Also break up small groups (< MIN_CLUSTER_SIZE) back into singles
   const groups = [];
   Object.values(rawGroups).forEach((members) => {
-    if (members.length <= MAX_CLUSTER_SIZE) {
+    if (members.length < MIN_CLUSTER_SIZE) {
+      // Pairs & singles stay as individual markers — displacement handles overlap
+      members.forEach((m) => groups.push([m]));
+    } else if (members.length <= MAX_CLUSTER_SIZE) {
       groups.push(members);
     } else {
-      // Sort by position (left-to-right, top-to-bottom) then chunk
       members.sort((a, b) => a.py - b.py || a.px - b.px);
       for (let i = 0; i < members.length; i += MAX_CLUSTER_SIZE) {
-        groups.push(members.slice(i, i + MAX_CLUSTER_SIZE));
+        const chunk = members.slice(i, i + MAX_CLUSTER_SIZE);
+        if (chunk.length < MIN_CLUSTER_SIZE) {
+          chunk.forEach((m) => groups.push([m]));
+        } else {
+          groups.push(chunk);
+        }
       }
     }
   });
 
   // Build cluster objects
   return groups.map((members) => {
-    // Centroid of real positions (in pixels)
     const cx = members.reduce((s, m) => s + m.px, 0) / members.length;
     const cy = members.reduce((s, m) => s + m.py, 0) / members.length;
-    // Centroid in lat/lng
     const centroidLL = map.containerPointToLatLng([cx, cy]);
 
     if (members.length === 1) {
-      // Single marker — no clustering needed
       const m = members[0];
-      const w = m.wide ? WIDE_LOGO_W : LOGO_SIZE;
       return {
         type: 'single',
         items: [m],
         cx, cy,
         centroidLatLng: [centroidLL.lat, centroidLL.lng],
-        w: w + MARKER_PAD,
-        h: LOGO_SIZE + MARKER_PAD,
+        w: m.w,
+        h: m.h,
       };
     }
 
@@ -473,22 +483,43 @@ function rectsOverlap(a, b) {
            a.y - a.h / 2 > b.y + b.h / 2);
 }
 
-function pushApart(mover, anchor, strength) {
+// Push two rects apart symmetrically (both move half the distance)
+function pushBothApart(a, b) {
+  let dx = a.x - b.x;
+  let dy = a.y - b.y;
+  const overlapX = (a.w + b.w) / 2 - Math.abs(dx);
+  const overlapY = (a.h + b.h) / 2 - Math.abs(dy);
+  if (overlapX <= 0 || overlapY <= 0) return false;
+
+  if (overlapX < overlapY) {
+    const push = Math.sign(dx || 1) * (overlapX / 2 + 1);
+    a.x += push;
+    b.x -= push;
+  } else {
+    const push = Math.sign(dy || 1) * (overlapY / 2 + 1);
+    a.y += push;
+    b.y -= push;
+  }
+  return true;
+}
+
+// Push mover away from a pinned anchor (only mover moves)
+function pushAwayFrom(mover, anchor) {
   let dx = mover.x - anchor.x;
   let dy = mover.y - anchor.y;
-  // Minimum push to clear overlap
   const overlapX = (mover.w + anchor.w) / 2 - Math.abs(dx);
   const overlapY = (mover.h + anchor.h) / 2 - Math.abs(dy);
-  if (overlapX <= 0 || overlapY <= 0) return;
+  if (overlapX <= 0 || overlapY <= 0) return false;
+
   if (overlapX < overlapY) {
-    mover.x += Math.sign(dx || 1) * overlapX * strength;
+    mover.x += Math.sign(dx || 1) * (overlapX + 1);
   } else {
-    mover.y += Math.sign(dy || 1) * overlapY * strength;
+    mover.y += Math.sign(dy || 1) * (overlapY + 1);
   }
+  return true;
 }
 
 function displaceClusterRects(map, clusters, propertyLatLng) {
-  // Build movable rects for each cluster/single
   const rects = clusters.map((c, i) => ({
     x: c.cx, y: c.cy,
     w: c.w, h: c.h,
@@ -497,25 +528,29 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
   }));
 
   // Subject property rect (pinned, never moves)
+  // The icon anchor is at [70, 76] (bottom-center), so the marker extends
+  // 76px upward from the lat/lng point. Offset the rect center accordingly.
   const propPt = map.latLngToContainerPoint(propertyLatLng);
-  const propRect = { x: propPt.x, y: propPt.y, w: 140 + MARKER_PAD, h: 76 + MARKER_PAD };
+  const propW = 140 + MARKER_PAD * 2;
+  const propH = 76 + MARKER_PAD * 2;
+  const propRect = { x: propPt.x, y: propPt.y - propH / 2, w: propW, h: propH };
 
-  for (let iter = 0; iter < 35; iter++) {
+  for (let iter = 0; iter < 60; iter++) {
     let moved = false;
 
-    // Push away from subject property first (full strength, highest priority)
+    // Push away from subject property first (full clear, highest priority)
     for (const r of rects) {
       if (rectsOverlap(r, propRect)) {
-        pushApart(r, propRect, 1.0);
+        pushAwayFrom(r, propRect);
         moved = true;
       }
     }
 
-    // Push clusters/singles apart from each other (stronger push)
+    // Push all markers/clusters apart from each other symmetrically
     for (let i = 0; i < rects.length; i++) {
       for (let j = i + 1; j < rects.length; j++) {
         if (rectsOverlap(rects[i], rects[j])) {
-          pushApart(rects[i], rects[j], 0.6);
+          pushBothApart(rects[i], rects[j]);
           moved = true;
         }
       }
@@ -540,6 +575,11 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
+  // Store user drag overrides: key → [lat, lng]
+  // Key is "s-{idx}" for singles, "c-{sorted idx list}" for clusters
+  const dragOverrides = useRef({});
+  // Track whether a drag just finished to suppress the moveend re-render
+  const justDragged = useRef(false);
 
   useEffect(() => {
     const layers = L.layerGroup().addTo(map);
@@ -556,6 +596,11 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
     const layers = layerGroupRef.current;
     const lines = linesGroupRef.current;
     if (!layers || !lines) return;
+
+    function getClusterKey(cluster) {
+      if (cluster.type === 'single') return `s-${cluster.items[0].idx}`;
+      return `c-${cluster.items.map((i) => i.idx).sort((a, b) => a - b).join(',')}`;
+    }
 
     function render() {
       layers.clearLayers();
@@ -584,23 +629,44 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const dp = displaced[ci];
         if (!dp) return;
 
+        const clusterKey = getClusterKey(cluster);
+        // Use drag override position if user has repositioned this marker
+        const overridePos = dragOverrides.current[clusterKey];
+        const markerLatLng = overridePos || dp.displacedLatLng;
+
         if (cluster.type === 'single') {
-          // Render single marker at displaced position
+          // Render single marker at displaced (or overridden) position
           const item = cluster.items[0];
           const child = children.find((c) => c && c.idx === item.idx);
           if (!child) return;
 
-          const marker = L.marker(dp.displacedLatLng, { icon: child.icon });
+          const marker = L.marker(markerLatLng, {
+            icon: child.icon,
+            draggable: true,
+          });
           if (child.popup) marker.bindPopup(child.popup);
           marker.on('click', () => {
             if (onMarkerClick) onMarkerClick(item.idx);
           });
+          marker.on('dragstart', () => {
+            justDragged.current = true;
+          });
+          marker.on('dragend', (e) => {
+            const pos = e.target.getLatLng();
+            dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
+            // Re-draw connecting lines after drag
+            justDragged.current = true;
+            render();
+          });
           if (markerRefs) markerRefs.current[`r-${item.idx}`] = marker;
           layers.addLayer(marker);
         } else {
-          // Render cluster icon at displaced position
+          // Render cluster icon at displaced (or overridden) position
           const icon = createClusterGridIcon(cluster, children);
-          const marker = L.marker(dp.displacedLatLng, { icon });
+          const marker = L.marker(markerLatLng, {
+            icon,
+            draggable: true,
+          });
 
           // Build cluster popup listing all retailers
           const names = cluster.items.map((item) => {
@@ -619,6 +685,15 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
               onMarkerClick(cluster.items[0].idx);
             }
           });
+          marker.on('dragstart', () => {
+            justDragged.current = true;
+          });
+          marker.on('dragend', (e) => {
+            const pos = e.target.getLatLng();
+            dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
+            justDragged.current = true;
+            render();
+          });
 
           // Store ref for all items in this cluster
           cluster.items.forEach((item) => {
@@ -627,10 +702,16 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           layers.addLayer(marker);
         }
 
-        // Draw connecting line if displaced
-        if (dp.wasDisplaced) {
+        // Draw connecting line from marker back to true centroid
+        const finalLatLng = overridePos || dp.displacedLatLng;
+        const origLatLng = cluster.centroidLatLng;
+        const finalPt = map.latLngToContainerPoint(finalLatLng);
+        const origPt = map.latLngToContainerPoint(origLatLng);
+        const lineDist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
+
+        if (lineDist > 3) {
           const line = L.polyline(
-            [dp.displacedLatLng, cluster.centroidLatLng],
+            [finalLatLng, origLatLng],
             {
               weight: 1.5,
               color: '#8a9aaa',
@@ -643,7 +724,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           lines.addLayer(line);
 
           // Anchor dot at real centroid
-          const anchor = L.circleMarker(cluster.centroidLatLng, {
+          const anchor = L.circleMarker(origLatLng, {
             radius: 3,
             fillColor: '#8a9aaa',
             fillOpacity: 0.5,
@@ -661,16 +742,30 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
     // Debounced re-render on zoom/pan to avoid excessive recalculation
     let timer = null;
     const debouncedRender = () => {
+      // Skip re-render if it was triggered by a drag (marker already repositioned)
+      if (justDragged.current) {
+        justDragged.current = false;
+        return;
+      }
       if (timer) clearTimeout(timer);
-      timer = setTimeout(render, 120);
+      // On zoom change, clear drag overrides since pixel positions shift
+      timer = setTimeout(() => {
+        render();
+      }, 120);
     };
 
-    map.on('zoomend', debouncedRender);
+    const onZoom = () => {
+      // Clear drag overrides on zoom since cluster composition may change
+      dragOverrides.current = {};
+      debouncedRender();
+    };
+
+    map.on('zoomend', onZoom);
     map.on('moveend', debouncedRender);
 
     return () => {
       if (timer) clearTimeout(timer);
-      map.off('zoomend', debouncedRender);
+      map.off('zoomend', onZoom);
       map.off('moveend', debouncedRender);
     };
   }, [children, onMarkerClick, markerRefs, propertyLatLng, map]);
@@ -1110,24 +1205,7 @@ export default function App() {
       const blob = await new Promise((resolve) =>
         canvas.toBlob(resolve, 'image/png')
       );
-      if (!blob) {
-        console.error('Failed to create PNG blob');
-        return;
-      }
-
-      // On mobile, try the native share sheet (best UX for saving images)
-      if (navigator.share && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
-        try {
-          const file = new File([blob], filename, { type: 'image/png' });
-          await navigator.share({ files: [file] });
-          return;
-        } catch (shareErr) {
-          // User cancelled share or share not supported for files — fall through
-          if (shareErr.name === 'AbortError') return;
-        }
-      }
-
-      // Desktop / fallback: standard download via blob URL
+      if (!blob) return;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = filename;
@@ -1414,6 +1492,7 @@ export default function App() {
           zoom={12}
           style={{ width: '100%', height: '100%' }}
           ref={mapRef}
+          tap={false}
         >
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"

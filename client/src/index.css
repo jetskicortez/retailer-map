@@ -640,14 +640,15 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 8px;
-  background: #ffffff;
+  background: #ffffff !important;
   border: 2px solid #c9a84c;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   padding: 3px;
+  cursor: grab;
 }
 
 .logo-marker.logo-wide {
@@ -660,6 +661,30 @@ body {
   max-height: 100%;
   object-fit: contain;
   display: block;
+  pointer-events: none;
+}
+
+/* Let touch events pass through to Leaflet's drag handler */
+.logo-marker,
+.smart-cluster {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.logo-marker *,
+.smart-cluster * {
+  pointer-events: none;
+}
+
+/* ---- Override Leaflet div-icon defaults ---- */
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-dragging .leaflet-marker-icon {
+  cursor: grabbing !important;
 }
 
 /* ---- Smart Cluster Grid Icons ---- */
@@ -667,28 +692,30 @@ body {
   display: grid;
   gap: 3px;
   padding: 6px;
-  background: rgba(26, 42, 56, 0.92);
-  border: 1.5px solid rgba(201, 168, 76, 0.35);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  background: #ffffff !important;
+  border: 2px solid #c9a84c;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.04);
   position: relative;
-  cursor: pointer;
-  transition: border-color 0.15s;
+  cursor: grab;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .smart-cluster:hover {
-  border-color: rgba(201, 168, 76, 0.6);
+  border-color: #b8952e;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .sc-cell {
   width: 32px;
   height: 32px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  background: #ffffff !important;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  border: 1px solid #e0ddd8;
 }
 
 .sc-cell img {
@@ -701,28 +728,28 @@ body {
 .sc-cell-text {
   font-size: 13px;
   font-weight: 700;
-  color: var(--text-muted);
   font-family: 'DM Sans', sans-serif;
 }
 
 .sc-count {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 18px;
-  height: 18px;
+  top: -8px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
   padding: 0 5px;
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--gold);
-  color: var(--bg);
-  font-size: 10px;
+  color: #fff;
+  font-size: 11px;
   font-weight: 700;
   font-family: 'DM Sans', sans-serif;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  border: 1.5px solid #fff;
 }
 
 /* ---- Connecting lines (rendered via L.canvas — no CSS needed) ---- */

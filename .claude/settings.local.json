@@ -135,7 +135,16 @@
       "Bash(curl -sL --max-time 10 -o \"CVS-ddd.png\" \"https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/CVS_Health_logo_2014.svg/200px-CVS_Health_logo_2014.svg.png\")",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(gh auth:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth status)",
+      "Bash(\"/c/Program Files \\(x86\\)/GitHub CLI/gh.exe\" auth status)",
+      "Bash(cmd.exe /c \"gh auth status\")",
+      "Bash(cmd.exe /c \"gh repo create retailer-map --public --source=. --remote=origin --push --description \"\"Retailer Map Generator for The Colony Agency commercial real estate\"\"\")",
+      "Bash(cmd.exe /c \"gh repo view jetskicortez/retailer-map --json url,name 2>&1\")",
+      "Bash(powershell.exe -NoProfile -Command \"gh repo create retailer-map --public --source=. --remote=origin --push --description ''Retailer Map Generator for The Colony Agency commercial real estate''\")",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo create retailer-map --public --source=. --remote=origin --push --description ''Retailer Map Generator for The Colony Agency commercial real estate''\")",
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe'' repo view --json url --jq ''.url''\")"
     ]
   }
 }

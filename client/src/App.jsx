@@ -995,6 +995,8 @@ export default function App() {
 
   const captureMapForExport = useCallback(async () => {
     if (!mapPanelRef.current) return null;
+    const panel = mapPanelRef.current;
+    const map = mapRef.current;
 
     // Hide ALL UI controls / overlays so only the map + markers show
     const hideSelectors = [
@@ -1005,53 +1007,69 @@ export default function App() {
       '.mobile-export-bar',
       '.mobile-menu-btn',
     ].join(', ');
-    const hidden = mapPanelRef.current.querySelectorAll(hideSelectors);
-    // Also hide any elements outside mapPanelRef that overlap (mobile menu btn)
-    const globalHidden = document.querySelectorAll('.mobile-menu-btn, .sidebar-overlay');
+    const hidden = panel.querySelectorAll(hideSelectors);
+    const globalHidden = document.querySelectorAll(
+      '.mobile-menu-btn, .sidebar-overlay, .sidebar'
+    );
     hidden.forEach((el) => (el.style.display = 'none'));
     globalHidden.forEach((el) => (el.style.display = 'none'));
 
-    const fixed = fixObjectFitForExport(mapPanelRef.current);
+    // Save original panel styles
+    const origPosition = panel.style.position;
+    const origWidth = panel.style.width;
+    const origHeight = panel.style.height;
+    const origLeft = panel.style.left;
+    const origTop = panel.style.top;
+    const origZIndex = panel.style.zIndex;
+    const origFlex = panel.style.flex;
+
+    // Force panel to landscape 11:8.5 aspect ratio (1100×850px capture area)
+    const CAPTURE_W = 1100;
+    const CAPTURE_H = 850;
+    panel.style.position = 'fixed';
+    panel.style.left = '0';
+    panel.style.top = '0';
+    panel.style.width = CAPTURE_W + 'px';
+    panel.style.height = CAPTURE_H + 'px';
+    panel.style.zIndex = '-9999';
+    panel.style.flex = 'none';
+
+    // Let Leaflet know the container size changed and re-render tiles
+    if (map) {
+      map.invalidateSize({ animate: false });
+    }
+    // Wait for tiles to load and layout to settle
+    await new Promise((r) => setTimeout(r, 600));
+
+    const fixed = fixObjectFitForExport(panel);
     try {
-      // Capture at high resolution
-      const rawCanvas = await html2canvas(mapPanelRef.current, {
+      // Capture at 3× for 300 DPI quality (1100×3 = 3300, 850×3 = 2550)
+      const canvas = await html2canvas(panel, {
+        width: CAPTURE_W,
+        height: CAPTURE_H,
         scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
       });
 
-      // Resize / crop to exact 8.5×11 landscape (cover-fit)
-      const outCanvas = document.createElement('canvas');
-      outCanvas.width = EXPORT_W;
-      outCanvas.height = EXPORT_H;
-      const ctx = outCanvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
-
-      const srcRatio = rawCanvas.width / rawCanvas.height;
-      const dstRatio = EXPORT_W / EXPORT_H;
-      let sx, sy, sw, sh;
-      if (srcRatio > dstRatio) {
-        // source is wider — crop sides
-        sh = rawCanvas.height;
-        sw = rawCanvas.height * dstRatio;
-        sx = (rawCanvas.width - sw) / 2;
-        sy = 0;
-      } else {
-        // source is taller — crop top/bottom
-        sw = rawCanvas.width;
-        sh = rawCanvas.width / dstRatio;
-        sx = 0;
-        sy = (rawCanvas.height - sh) / 2;
-      }
-      ctx.drawImage(rawCanvas, sx, sy, sw, sh, 0, 0, EXPORT_W, EXPORT_H);
-
-      return outCanvas;
+      return canvas;
     } finally {
       restoreObjectFit(fixed);
+      // Restore original panel styles
+      panel.style.position = origPosition;
+      panel.style.width = origWidth;
+      panel.style.height = origHeight;
+      panel.style.left = origLeft;
+      panel.style.top = origTop;
+      panel.style.zIndex = origZIndex;
+      panel.style.flex = origFlex;
       hidden.forEach((el) => (el.style.display = ''));
       globalHidden.forEach((el) => (el.style.display = ''));
+      // Restore Leaflet to original size
+      if (map) {
+        map.invalidateSize({ animate: false });
+      }
     }
   }, []);
 

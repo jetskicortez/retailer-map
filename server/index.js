@@ -5,7 +5,10 @@ import express from 'express';
 import cors from 'cors';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: resolve(__dirname, '..', '.env'), override: true });
+// On Vercel, env vars are injected via the dashboard — dotenv is only needed locally
+if (process.env.VERCEL !== '1') {
+  dotenv.config({ path: resolve(__dirname, '..', '.env'), override: true });
+}
 
 const app = express();
 const PORT = 3001;
@@ -501,6 +504,11 @@ app.post('/api/places-nearby', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// Only start listening when run directly (not when imported by Vercel)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+export default app;

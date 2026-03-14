@@ -229,8 +229,8 @@ const LOGO_FILES = {
   'sherwin williams': 'Sherwin-Williams.png',
   'salvation army': 'Salvation Army.png',
   'the salvation army': 'Salvation Army.png',
-  'true value': 'True Value.svg',
-  'true value of latrobe': 'True Value.svg',
+  'true value': 'True Value.png',
+  'true value of latrobe': 'True Value.png',
   "fox's pizza den": 'Foxs Pizza.png',
   'foxs pizza den': 'Foxs Pizza.png',
   "fox's pizza": 'Foxs Pizza.png',
@@ -672,7 +672,7 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
 }
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
-function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng }) {
+function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef }) {
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
@@ -707,8 +707,12 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       layers.clearLayers();
       lines.clearLayers();
       if (markerRefs) markerRefs.current = {};
+      const connectors = []; // collect connector line data for export
 
-      if (!Array.isArray(children) || children.length === 0 || !propertyLatLng) return;
+      if (!Array.isArray(children) || children.length === 0 || !propertyLatLng) {
+        if (connectorDataRef) connectorDataRef.current = [];
+        return;
+      }
 
       const propLL = L.latLng(propertyLatLng[0], propertyLatLng[1]);
 
@@ -734,11 +738,11 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const overridePos = dragOverrides.current[clusterKey];
         const markerLatLng = overridePos || dp.displacedLatLng;
 
-        // Determine if displaced
+        // Show connector if user dragged this marker OR if collision algorithm displaced it
         const finalPt = map.latLngToContainerPoint(markerLatLng);
         const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
         const dist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
-        const isDisplaced = dist > 5;
+        const isDisplaced = !!overridePos || dist > 5;
 
         if (cluster.type === 'single') {
           const item = cluster.items[0];
@@ -793,7 +797,13 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
         // Draw connector line from marker to actual map location
         if (isDisplaced) {
-          // Solid thin line
+          // Store data for canvas-based export drawing
+          connectors.push({
+            from: Array.isArray(markerLatLng) ? markerLatLng : [markerLatLng.lat, markerLatLng.lng],
+            to: Array.isArray(cluster.centroidLatLng) ? cluster.centroidLatLng : [cluster.centroidLatLng.lat, cluster.centroidLatLng.lng],
+          });
+
+          // Solid thin line (visible on screen via SVG renderer)
           const line = L.polyline(
             [markerLatLng, cluster.centroidLatLng],
             {
@@ -820,6 +830,9 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           lines.addLayer(dot);
         }
       });
+
+      // Expose connector data for canvas-based export drawing
+      if (connectorDataRef) connectorDataRef.current = connectors;
     }
 
     render();
@@ -827,19 +840,20 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
     // Debounced re-render on zoom/pan to avoid excessive recalculation
     let timer = null;
     const debouncedRender = () => {
-      // Skip re-render if it was triggered by a drag (marker already repositioned)
-      if (justDragged.current) {
+      // Skip re-render during export or if triggered by a drag
+      if ((isExportingRef && isExportingRef.current) || justDragged.current) {
         justDragged.current = false;
         return;
       }
       if (timer) clearTimeout(timer);
-      // On zoom change, clear drag overrides since pixel positions shift
       timer = setTimeout(() => {
         render();
       }, 120);
     };
 
     const onZoom = () => {
+      // Don't clear drag overrides during export — we need them preserved
+      if (isExportingRef && isExportingRef.current) return;
       // Clear drag overrides on zoom since cluster composition may change
       dragOverrides.current = {};
       debouncedRender();
@@ -949,6 +963,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const markerRefs = useRef({});
+  const connectorDataRef = useRef([]);
+  const isExportingRef = useRef(false);
   const cardRefs = useRef({});
   const mapRef = useRef(null);
   const mapPanelRef = useRef(null);
@@ -1181,6 +1197,8 @@ export default function App() {
 
   const captureMapForExport = useCallback(async () => {
     if (!mapPanelRef.current) return null;
+    // Prevent SmartClusterLayer from clearing drag overrides during export
+    isExportingRef.current = true;
     const panel = mapPanelRef.current;
     const map = mapRef.current;
 
@@ -1291,6 +1309,36 @@ export default function App() {
       ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
       ctx.drawImage(rawCanvas, 0, 0, EXPORT_W, EXPORT_H);
 
+      // Draw connector lines directly on canvas (html2canvas can't capture Leaflet SVG overlay)
+      if (map && connectorDataRef.current.length > 0) {
+        const scaleX = EXPORT_W / CAPTURE_W;
+        const scaleY = EXPORT_H / CAPTURE_H;
+        connectorDataRef.current.forEach(({ from, to }) => {
+          const fromPt = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
+          const toPt = map.latLngToContainerPoint(L.latLng(to[0], to[1]));
+          const x1 = fromPt.x * scaleX, y1 = fromPt.y * scaleY;
+          const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
+
+          // Thin solid line
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = 'rgba(153, 153, 153, 0.5)';
+          ctx.lineWidth = 1.2 * scaleX;
+          ctx.stroke();
+
+          // Filled dot at the actual location
+          const dotR = 3.5 * scaleX;
+          ctx.beginPath();
+          ctx.arc(x2, y2, dotR, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(136, 136, 136, 0.8)';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5 * scaleX;
+          ctx.stroke();
+        });
+      }
+
       return outCanvas;
     } finally {
       restoreObjectFit(fixed);
@@ -1301,6 +1349,8 @@ export default function App() {
       }
       hidden.forEach((el) => (el.style.display = ''));
       globalHidden.forEach((el) => (el.style.display = ''));
+      // Re-enable SmartClusterLayer event handlers BEFORE restoring view
+      isExportingRef.current = false;
       // Restore original map view and size
       if (map) {
         map.invalidateSize({ animate: false });
@@ -1641,6 +1691,8 @@ export default function App() {
             onMarkerClick={handleMarkerClick}
             markerRefs={markerRefs}
             propertyLatLng={data ? [data.property.lat, data.property.lng] : null}
+            connectorDataRef={connectorDataRef}
+            isExportingRef={isExportingRef}
           >
             {data?.retailers.map((r, i) => {
               if (!filteredRetailers.includes(r)) return null;

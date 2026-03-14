@@ -672,7 +672,7 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
 }
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
-function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef }) {
+function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef }) {
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
@@ -738,11 +738,11 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const overridePos = dragOverrides.current[clusterKey];
         const markerLatLng = overridePos || dp.displacedLatLng;
 
-        // Determine if displaced
+        // Show connector if user dragged this marker OR if collision algorithm displaced it
         const finalPt = map.latLngToContainerPoint(markerLatLng);
         const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
         const dist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
-        const isDisplaced = dist > 5;
+        const isDisplaced = !!overridePos || dist > 5;
 
         if (cluster.type === 'single') {
           const item = cluster.items[0];
@@ -840,19 +840,20 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
     // Debounced re-render on zoom/pan to avoid excessive recalculation
     let timer = null;
     const debouncedRender = () => {
-      // Skip re-render if it was triggered by a drag (marker already repositioned)
-      if (justDragged.current) {
+      // Skip re-render during export or if triggered by a drag
+      if ((isExportingRef && isExportingRef.current) || justDragged.current) {
         justDragged.current = false;
         return;
       }
       if (timer) clearTimeout(timer);
-      // On zoom change, clear drag overrides since pixel positions shift
       timer = setTimeout(() => {
         render();
       }, 120);
     };
 
     const onZoom = () => {
+      // Don't clear drag overrides during export — we need them preserved
+      if (isExportingRef && isExportingRef.current) return;
       // Clear drag overrides on zoom since cluster composition may change
       dragOverrides.current = {};
       debouncedRender();
@@ -963,6 +964,7 @@ export default function App() {
 
   const markerRefs = useRef({});
   const connectorDataRef = useRef([]);
+  const isExportingRef = useRef(false);
   const cardRefs = useRef({});
   const mapRef = useRef(null);
   const mapPanelRef = useRef(null);
@@ -1195,6 +1197,8 @@ export default function App() {
 
   const captureMapForExport = useCallback(async () => {
     if (!mapPanelRef.current) return null;
+    // Prevent SmartClusterLayer from clearing drag overrides during export
+    isExportingRef.current = true;
     const panel = mapPanelRef.current;
     const map = mapRef.current;
 
@@ -1345,6 +1349,8 @@ export default function App() {
       }
       hidden.forEach((el) => (el.style.display = ''));
       globalHidden.forEach((el) => (el.style.display = ''));
+      // Re-enable SmartClusterLayer event handlers BEFORE restoring view
+      isExportingRef.current = false;
       // Restore original map view and size
       if (map) {
         map.invalidateSize({ animate: false });
@@ -1686,6 +1692,7 @@ export default function App() {
             markerRefs={markerRefs}
             propertyLatLng={data ? [data.property.lat, data.property.lng] : null}
             connectorDataRef={connectorDataRef}
+            isExportingRef={isExportingRef}
           >
             {data?.retailers.map((r, i) => {
               if (!filteredRetailers.includes(r)) return null;

@@ -804,10 +804,26 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
         // Draw connector line from marker to actual map location
         if (isDisplaced) {
+          // Get the icon size for this marker/cluster for export masking
+          let iconW, iconH;
+          if (cluster.type === 'single') {
+            const child = children.find((c) => c && c.idx === cluster.items[0].idx);
+            iconW = child?.icon?.options?.iconSize?.[0] || LOGO_MIN_W;
+            iconH = child?.icon?.options?.iconSize?.[1] || LOGO_H;
+          } else {
+            // Cluster grid — compute from createClusterGridIcon logic
+            const cols = cluster.items.length <= 3 ? cluster.items.length : Math.ceil(Math.sqrt(cluster.items.length));
+            const rows = Math.ceil(cluster.items.length / cols);
+            iconW = cols * CLUSTER_CELL + (cols - 1) * CLUSTER_GAP + CLUSTER_PAD * 2;
+            iconH = rows * CLUSTER_CELL + (rows - 1) * CLUSTER_GAP + CLUSTER_PAD * 2;
+          }
+
           // Store data for canvas-based export drawing
           connectors.push({
             from: Array.isArray(markerLatLng) ? markerLatLng : [markerLatLng.lat, markerLatLng.lng],
             to: Array.isArray(cluster.centroidLatLng) ? cluster.centroidLatLng : [cluster.centroidLatLng.lat, cluster.centroidLatLng.lng],
+            iconW,
+            iconH,
           });
 
           // Connector line — colony red, 4pt weight, rendered below markers
@@ -1330,21 +1346,13 @@ export default function App() {
 
     const fixed = fixObjectFitForExport(panel);
     try {
-      // ── Two-pass capture for correct z-ordering ──
-      // Pass 1: Capture map tiles only (hide markers so connectors can go behind them)
+      // ── Single capture + connector compositing ──
+      // Hide the connector SVG pane (we draw connectors manually on canvas)
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
-      const markerPane = map?.getPane('markerPane');
-      const popupPane = map?.getPane('popupPane');
-      const tooltipPane = map?.getPane('tooltipPane');
       const connectorPane = map?.getPane('connectorPane');
-
-      // Hide markers + connectors for tiles-only capture
-      if (markerPane) markerPane.style.display = 'none';
-      if (popupPane) popupPane.style.display = 'none';
-      if (tooltipPane) tooltipPane.style.display = 'none';
       if (connectorPane) connectorPane.style.display = 'none';
 
-      const tilesCanvas = await html2canvas(panel, {
+      const rawCanvas = await html2canvas(panel, {
         width: CAPTURE_W,
         height: CAPTURE_H,
         windowWidth: CAPTURE_W,
@@ -1355,45 +1363,29 @@ export default function App() {
         backgroundColor: bgColor,
       });
 
-      // Pass 2: Capture markers only (show markers, hide tiles for transparent overlay)
-      if (markerPane) markerPane.style.display = '';
-      if (popupPane) popupPane.style.display = '';
-      if (tooltipPane) tooltipPane.style.display = '';
-      // Keep connectorPane hidden — we draw connectors manually
-
-      const tilePane = map?.getPane('tilePane');
-      if (tilePane) tilePane.style.display = 'none';
-
-      const markersCanvas = await html2canvas(panel, {
-        width: CAPTURE_W,
-        height: CAPTURE_H,
-        windowWidth: CAPTURE_W,
-        windowHeight: CAPTURE_H,
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null, // transparent
-      });
-
-      // Restore all panes
-      if (tilePane) tilePane.style.display = '';
+      // Restore connector pane
       if (connectorPane) connectorPane.style.display = '';
 
-      // ── Composite: tiles → connectors → markers ──
+      // Build output canvas at 300 DPI landscape letter
       const outCanvas = document.createElement('canvas');
       outCanvas.width = EXPORT_W;   // 3300
       outCanvas.height = EXPORT_H;  // 2550
       const ctx = outCanvas.getContext('2d');
-
-      // Layer 1: Map tiles
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
-      ctx.drawImage(tilesCanvas, 0, 0, EXPORT_W, EXPORT_H);
 
-      // Layer 2: Connector lines (below markers)
+      // Layer 1: Full capture (tiles + markers)
+      ctx.drawImage(rawCanvas, 0, 0, EXPORT_W, EXPORT_H);
+
+      // Layer 2: Draw connector lines, then re-stamp marker regions on top
       if (map && connectorDataRef.current.length > 0) {
         const scaleX = EXPORT_W / CAPTURE_W;
         const scaleY = EXPORT_H / CAPTURE_H;
+        // Scale from rawCanvas coords (CAPTURE_W * 3) to output coords (EXPORT_W)
+        const rawToOutX = EXPORT_W / rawCanvas.width;
+        const rawToOutY = EXPORT_H / rawCanvas.height;
+
+        // Draw all connector lines
         connectorDataRef.current.forEach(({ from, to }) => {
           const fromPt = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
           const toPt = map.latLngToContainerPoint(L.latLng(to[0], to[1]));
@@ -1418,10 +1410,37 @@ export default function App() {
           ctx.lineWidth = 2.5 * scaleX;
           ctx.stroke();
         });
-      }
 
-      // Layer 3: Markers on top
-      ctx.drawImage(markersCanvas, 0, 0, EXPORT_W, EXPORT_H);
+        // Re-stamp marker/cluster regions from the original capture on top of connectors
+        // This ensures logos cover the connector lines where they overlap
+        connectorDataRef.current.forEach(({ from, iconW, iconH }) => {
+          const fromPt = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
+          // Marker box in container coords (icon anchor is center)
+          const pad = 12; // Extra padding around marker box
+          const boxX = fromPt.x - iconW / 2 - pad;
+          const boxY = fromPt.y - iconH / 2 - pad;
+          const boxW = iconW + pad * 2;
+          const boxH = iconH + pad * 2;
+
+          // Source rect in rawCanvas pixel coords (rawCanvas is CAPTURE_W * scale)
+          const srcX = boxX * (rawCanvas.width / CAPTURE_W);
+          const srcY = boxY * (rawCanvas.height / CAPTURE_H);
+          const srcW = boxW * (rawCanvas.width / CAPTURE_W);
+          const srcH = boxH * (rawCanvas.height / CAPTURE_H);
+
+          // Dest rect in output coords
+          const dstX = boxX * scaleX;
+          const dstY = boxY * scaleY;
+          const dstW = boxW * scaleX;
+          const dstH = boxH * scaleY;
+
+          // Clamp to canvas bounds
+          if (srcX >= 0 && srcY >= 0 && srcW > 0 && srcH > 0 &&
+              srcX + srcW <= rawCanvas.width && srcY + srcH <= rawCanvas.height) {
+            ctx.drawImage(rawCanvas, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
+          }
+        });
+      }
 
       return outCanvas;
     } finally {

@@ -41,10 +41,21 @@ function getCategoryConfig(category) {
 }
 
 // ── SVG icon builders ────────────────────────────────────────────
-function createPropertyIcon() {
+function getStreetAddress(fullAddress) {
+  if (!fullAddress) return 'SUBJECT PROPERTY';
+  // Extract street portion: everything before the city/state/zip
+  // Typically "123 Main St, City, ST 12345" → "123 Main St"
+  const parts = fullAddress.split(',');
+  return parts[0].trim() || 'SUBJECT PROPERTY';
+}
+
+function createPropertyIcon(streetAddress) {
+  const label = streetAddress || 'SUBJECT PROPERTY';
+  // Estimate label width: ~7.5px per character at the label font size, min 140px
+  const labelW = Math.max(140, label.length * 7.5 + 24);
   const html = `<div class="property-marker">
     <div class="property-pulse"></div>
-    <div class="property-label">SUBJECT PROPERTY</div>
+    <div class="property-label">${label}</div>
     <div class="property-pin">
       <svg width="36" height="46" viewBox="0 0 36 46" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -64,12 +75,12 @@ function createPropertyIcon() {
       </svg>
     </div>
   </div>`;
-  // Total height: ~30px label + 46px pin = 76px; width driven by label (~140px)
+  // Total height: ~30px label + 46px pin = 76px
   return L.divIcon({
     html,
     className: '',
-    iconSize: [140, 76],
-    iconAnchor: [70, 76],
+    iconSize: [labelW, 76],
+    iconAnchor: [labelW / 2, 76],
     popupAnchor: [0, -76],
   });
 }
@@ -2052,7 +2063,7 @@ export default function App() {
           {data && (
             <Marker
               position={[data.property.lat, data.property.lng]}
-              icon={createPropertyIcon()}
+              icon={createPropertyIcon(getStreetAddress(data.property.display))}
               zIndexOffset={10000}
             >
               <Popup>

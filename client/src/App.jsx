@@ -92,7 +92,261 @@ function createRetailerIcon(category) {
 }
 
 // ── Logo-based marker icons ──────────────────────────────────────
-// Map of normalized retailer names → logo filenames in /logos/
+// BrandFetch CDN client ID for dynamic logo fetching
+const BRANDFETCH_ID = '1idmdqs82nFxq8ItTXO';
+
+// Map of normalized retailer names → website domains for BrandFetch CDN
+const RETAILER_DOMAINS = {
+  'att': 'att.com',
+  'at&t': 'att.com',
+  'aarons': 'aarons.com',
+  "aaron's": 'aarons.com',
+  'anytime fitness': 'anytimefitness.com',
+  "arby's": 'arbys.com',
+  'arbys': 'arbys.com',
+  'bp': 'bp.com',
+  'barnes & noble': 'barnesandnoble.com',
+  'barnes and noble': 'barnesandnoble.com',
+  'big lots': 'biglots.com',
+  'bob evans': 'bobevans.com',
+  'bob evans restaurant': 'bobevans.com',
+  'buffalo wild wings': 'buffalowildwings.com',
+  'burger king': 'bk.com',
+  'chase': 'chase.com',
+  'chase bank': 'chase.com',
+  'jpmorgan chase': 'chase.com',
+  'the cheesecake factory': 'thecheesecakefactory.com',
+  'cheesecake factory': 'thecheesecakefactory.com',
+  'cracker barrel': 'crackerbarrel.com',
+  'cracker barrel old country store': 'crackerbarrel.com',
+  'cricket wireless': 'cricketwireless.com',
+  'dairy queen': 'dairyqueen.com',
+  "denny's": 'dennys.com',
+  'dennys': 'dennys.com',
+  'dollar general': 'dollargeneral.com',
+  'dg market': 'dollargeneral.com',
+  'dollar tree': 'dollartree.com',
+  "domino's": 'dominos.com',
+  "domino's pizza": 'dominos.com',
+  'dominos': 'dominos.com',
+  'family dollar': 'familydollar.com',
+  'fifth third bank': '53.com',
+  'first national bank': 'fnb-online.com',
+  'first watch': 'firstwatch.com',
+  'five guys': 'fiveguys.com',
+  "gabe's": 'gabes.com',
+  'gabes': 'gabes.com',
+  'goodwill': 'goodwill.org',
+  'h&r block': 'hrblock.com',
+  'hr block': 'hrblock.com',
+  'harbor freight': 'harborfreight.com',
+  'harbor freight tools': 'harborfreight.com',
+  'hobby lobby': 'hobbylobby.com',
+  'home depot': 'homedepot.com',
+  'the home depot': 'homedepot.com',
+  'huntington bank': 'huntington.com',
+  'ihop': 'ihop.com',
+  "jimmy john's": 'jimmyjohns.com',
+  'jimmy johns': 'jimmyjohns.com',
+  "kohl's": 'kohls.com',
+  'kohls': 'kohls.com',
+  'kroger': 'kroger.com',
+  'la fitness': 'lafitness.com',
+  "lowe's": 'lowes.com',
+  "lowe's home improvement": 'lowes.com',
+  'lowes': 'lowes.com',
+  'marshalls': 'marshalls.com',
+  "moe's southwest grill": 'moes.com',
+  'moes grill': 'moes.com',
+  "ollie's bargain outlet": 'ollies.us',
+  'ollies': 'ollies.us',
+  'pnc': 'pnc.com',
+  'pnc bank': 'pnc.com',
+  'panda express': 'pandaexpress.com',
+  'panera bread': 'panerabread.com',
+  'panera': 'panerabread.com',
+  "papa john's": 'papajohns.com',
+  'papa johns': 'papajohns.com',
+  'pep boys': 'pepboys.com',
+  'pizza hut': 'pizzahut.com',
+  'planet fitness': 'planetfitness.com',
+  'primanti bros': 'primantibros.com',
+  "primanti brothers": 'primantibros.com',
+  "primanti bros.": 'primantibros.com',
+  'qdoba': 'qdoba.com',
+  'qdoba mexican eats': 'qdoba.com',
+  'qdoba mexican grill': 'qdoba.com',
+  'rei': 'rei.com',
+  'red robin': 'redrobin.com',
+  'red robin gourmet burgers': 'redrobin.com',
+  'rite aid': 'riteaid.com',
+  'rural king': 'ruralking.com',
+  "sam's club": 'samsclub.com',
+  'sams club': 'samsclub.com',
+  'shop n save': 'shopnsave.us',
+  "shop 'n save": 'shopnsave.us',
+  'state farm': 'statefarm.com',
+  "steak 'n shake": 'steaknshake.com',
+  'steak n shake': 'steaknshake.com',
+  'subway': 'subway.com',
+  'sunoco': 'sunoco.com',
+  'tj maxx': 'tjmaxx.com',
+  't.j. maxx': 'tjmaxx.com',
+  'taco bell': 'tacobell.com',
+  'target': 'target.com',
+  'texas roadhouse': 'texasroadhouse.com',
+  'tim hortons': 'timhortons.com',
+  'tractor supply': 'tractorsupply.com',
+  'tractor supply co.': 'tractorsupply.com',
+  'tractor supply company': 'tractorsupply.com',
+  'urban air': 'urbanair.com',
+  'urban outfitters': 'urbanoutfitters.com',
+  'verizon': 'verizon.com',
+  'verizon wireless': 'verizon.com',
+  'walgreens': 'walgreens.com',
+  'walmart': 'walmart.com',
+  'walmart supercenter': 'walmart.com',
+  'walmart neighborhood market': 'walmart.com',
+  'white castle': 'whitecastle.com',
+  'american freight': 'americanfreight.com',
+  "einstein bros. bagels": 'einsteinbros.com',
+  'einstein bros bagels': 'einsteinbros.com',
+  'bealls outlet': 'beallsoutlet.com',
+  "dunham's sports": 'dunhamssports.com',
+  'dunhams sports': 'dunhamssports.com',
+  "sportsman's warehouse": 'sportsmans.com',
+  'sportsmans warehouse': 'sportsmans.com',
+  'rent-a-center': 'rentacenter.com',
+  'smokey bones': 'smokeybones.com',
+  'upmc': 'upmc.com',
+  'napa auto parts': 'napaonline.com',
+  'napa': 'napaonline.com',
+  "o'reilly auto parts": 'oreillyauto.com',
+  'oreilly auto parts': 'oreillyauto.com',
+  "dunkin'": 'dunkindonuts.com',
+  'dunkin': 'dunkindonuts.com',
+  "dunkin' donuts": 'dunkindonuts.com',
+  'dunkin donuts': 'dunkindonuts.com',
+  'sheetz': 'sheetz.com',
+  'sherwin-williams': 'sherwin-williams.com',
+  'sherwin williams': 'sherwin-williams.com',
+  'salvation army': 'salvationarmy.org',
+  'the salvation army': 'salvationarmy.org',
+  'true value': 'truevalue.com',
+  'true value of latrobe': 'truevalue.com',
+  "fox's pizza den": 'foxspizza.com',
+  'foxs pizza den': 'foxspizza.com',
+  "fox's pizza": 'foxspizza.com',
+  'foxs pizza': 'foxspizza.com',
+  "mcdonald's": 'mcdonalds.com',
+  'mcdonalds': 'mcdonalds.com',
+  '7-eleven': '7-eleven.com',
+  '7 eleven': '7-eleven.com',
+  'kfc': 'kfc.com',
+  'kentucky fried chicken': 'kfc.com',
+  "wendy's": 'wendys.com',
+  'wendys': 'wendys.com',
+  'starbucks': 'starbucks.com',
+  'starbucks coffee': 'starbucks.com',
+  'cvs': 'cvs.com',
+  'cvs pharmacy': 'cvs.com',
+  'cvs health': 'cvs.com',
+  'aldi': 'aldi.us',
+  'giant eagle': 'gianteagle.com',
+  'giant eagle supermarket': 'gianteagle.com',
+  "jersey mike's": 'jerseymikes.com',
+  'jersey mikes': 'jerseymikes.com',
+  "jersey mike's subs": 'jerseymikes.com',
+  'petsmart': 'petsmart.com',
+  'advance auto parts': 'advanceautoparts.com',
+  'circle k': 'circlek.com',
+  'sonic': 'sonicdrivein.com',
+  'sonic drive-in': 'sonicdrivein.com',
+  'getgo': 'getgocafe.com',
+  'get go': 'getgocafe.com',
+  'petco': 'petco.com',
+  'chick-fil-a': 'chick-fil-a.com',
+  'chickfila': 'chick-fil-a.com',
+  'chipotle': 'chipotle.com',
+  'chipotle mexican grill': 'chipotle.com',
+  "applebee's": 'applebees.com',
+  'applebees': 'applebees.com',
+  'olive garden': 'olivegarden.com',
+  "popeyes": 'popeyes.com',
+  "popeye's": 'popeyes.com',
+  'popeyes louisiana kitchen': 'popeyes.com',
+  'autozone': 'autozone.com',
+  'auto zone': 'autozone.com',
+  'pet supplies plus': 'petsuppliesplus.com',
+  'speedway': 'speedway.com',
+  'valvoline': 'valvoline.com',
+  'valvoline instant oil change': 'valvoline.com',
+  'citizens bank': 'citizensbank.com',
+  'citizens': 'citizensbank.com',
+  'family dollar / dollar tree': 'familydollar.com',
+  'family dollar/dollar tree': 'familydollar.com',
+  // Hotels & lodging
+  'best western plus': 'bestwestern.com',
+  'best western': 'bestwestern.com',
+  'cambria hotels': 'choicehotels.com',
+  'cambria hotel': 'choicehotels.com',
+  'candlewood suites': 'ihg.com',
+  'clarion inn': 'choicehotels.com',
+  'comfort inn': 'choicehotels.com',
+  'comfort inn & suites': 'choicehotels.com',
+  'courtyard by marriott': 'marriott.com',
+  'courtyard marriott': 'marriott.com',
+  'doubletree by hilton': 'hilton.com',
+  'doubletree': 'hilton.com',
+  'even hotel': 'ihg.com',
+  'extended stay america': 'extendedstayamerica.com',
+  'extended stay america select suites': 'extendedstayamerica.com',
+  'hampton inn & suites': 'hilton.com',
+  'hampton inn': 'hilton.com',
+  'hilton garden inn': 'hilton.com',
+  'home2 suites by hilton': 'hilton.com',
+  'home2 suites': 'hilton.com',
+  'marriott': 'marriott.com',
+  'omni hotel': 'omnihotels.com',
+  'omni': 'omnihotels.com',
+  'quality inn': 'choicehotels.com',
+  'quality inn & suites': 'choicehotels.com',
+  'red roof inn': 'redroof.com',
+  'residence inn by marriott': 'marriott.com',
+  'residence inn': 'marriott.com',
+  'staybridge suites': 'ihg.com',
+  'towneplace suites by marriott': 'marriott.com',
+  'towneplace suites': 'marriott.com',
+  'wingate by wyndham': 'wyndhamhotels.com',
+  // Local/regional restaurants & businesses
+  'bravo cucina italiana': 'bravoitalian.com',
+  'bravo': 'bravoitalian.com',
+  'brighton hot dog shoppe': 'brightonhotdogshoppe.com',
+  'burgatory': 'burgatory.com',
+  'busy beaver': 'busybeaver.com',
+  'busy beaver building centers': 'busybeaver.com',
+  'commonplace coffee': 'commonplacecoffee.com',
+  'duquesne university': 'duq.edu',
+  'fnb financial center': 'fnb-online.com',
+  'fnb': 'fnb-online.com',
+  'first national bank financial center': 'fnb-online.com',
+  'hofbrauhaus': 'hofbrauhauspittsburgh.com',
+  'hofbrauhaus pittsburgh': 'hofbrauhauspittsburgh.com',
+  "jason's deli": 'jasonsdeli.com',
+  'jasons deli': 'jasonsdeli.com',
+  "jeni's ice cream": 'jenis.com',
+  "jeni's splendid ice creams": 'jenis.com',
+  'jenis ice cream': 'jenis.com',
+  'juniper grill': 'junipergrill.com',
+  'kura sushi': 'kurasushi.com',
+  'mad mex': 'madmex.com',
+  'nextier bank': 'nextierbank.com',
+  'ppg paints arena': 'ppgpaintsarena.com',
+  'pins mechanical': 'pinsmechanical.com',
+  'pins mechanical co': 'pinsmechanical.com',
+};
+
+// Fallback: local logo files for brands BrandFetch may not cover well
 const LOGO_FILES = {
   'att': 'ATT.png',
   'at&t': 'ATT.png',
@@ -364,17 +618,45 @@ const LOGO_FILES = {
   'waffles incaffeinated': 'Waffles INCaffeinated.png',
 };
 
-function getLogoUrl(retailerName) {
-  const normalized = retailerName.toLowerCase().trim();
+// Resolve a retailer name to a domain (for BrandFetch) and/or local file
+function _resolveName(normalized) {
   // Direct match
-  if (LOGO_FILES[normalized]) return `/logos/${LOGO_FILES[normalized]}`;
-  // Try without trailing punctuation/suffixes
-  for (const [key, file] of Object.entries(LOGO_FILES)) {
+  let domain = RETAILER_DOMAINS[normalized];
+  let file = LOGO_FILES[normalized];
+  if (domain || file) return { domain, file };
+  // Prefix/substring fallback
+  for (const [key, d] of Object.entries(RETAILER_DOMAINS)) {
     if (normalized.startsWith(key) || key.startsWith(normalized)) {
-      return `/logos/${file}`;
+      domain = d;
+      break;
     }
   }
-  return null;
+  for (const [key, f] of Object.entries(LOGO_FILES)) {
+    if (normalized.startsWith(key) || key.startsWith(normalized)) {
+      file = f;
+      break;
+    }
+  }
+  return { domain, file };
+}
+
+function getLogoUrl(retailerName) {
+  const normalized = retailerName.toLowerCase().trim();
+  const { domain, file } = _resolveName(normalized);
+  if (!domain && !file) return null;
+  const localUrl = file ? `/logos/${file}` : null;
+  const brandfetchUrl = domain
+    ? `https://cdn.brandfetch.io/${domain}/w/200/h/112/fallback/404?c=${BRANDFETCH_ID}`
+    : null;
+  // Return BrandFetch as primary, local as fallback
+  return brandfetchUrl || localUrl;
+}
+
+// Get local-only fallback URL for onerror handling
+function getLocalLogoUrl(retailerName) {
+  const normalized = retailerName.toLowerCase().trim();
+  const { file } = _resolveName(normalized);
+  return file ? `/logos/${file}` : null;
 }
 
 const LOGO_H = 56; // Fixed height for all logo markers
@@ -411,14 +693,20 @@ function getLogoMarkerW(logoUrl) {
   return Math.max(LOGO_MIN_W, Math.min(LOGO_MAX_W, Math.round(naturalW)));
 }
 
-function createLogoIcon(logoUrl) {
+function createLogoIcon(logoUrl, retailerName) {
   const markerW = getLogoMarkerW(logoUrl);
   // Inner dimensions after padding (8px) and border (1.5px) on each side
   const innerW = markerW - 19;
   const innerH = LOGO_H - 19;
 
+  // Build onerror: try local fallback, then hide if that also fails
+  const localFallback = retailerName ? getLocalLogoUrl(retailerName) : null;
+  const onerror = localFallback
+    ? `this.onerror=function(){this.style.display='none'};this.src='${localFallback}'`
+    : "this.style.display='none'";
+
   return L.divIcon({
-    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="this.style.display='none'" /></div>`,
+    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="${onerror}" /></div>`,
     className: '',
     iconSize: [markerW, LOGO_H],
     iconAnchor: [markerW / 2, LOGO_H / 2],
@@ -565,7 +853,11 @@ function createClusterGridIcon(cluster, childrenData) {
     if (!child) return '<div class="sc-cell"></div>';
     const logoUrl = child.logoUrl;
     if (logoUrl) {
-      return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="44" height="44" style="object-fit:contain;" onerror="this.style.display='none'" /></div>`;
+      const localFb = child.name ? getLocalLogoUrl(child.name) : null;
+      const cellErr = localFb
+        ? `this.onerror=function(){this.style.display='none'};this.src='${localFb}'`
+        : "this.style.display='none'";
+      return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="44" height="44" style="object-fit:contain;" onerror="${cellErr}" /></div>`;
     }
     // No logo — show initials with category color background
     const cfg = getCategoryConfig(child.category || 'Other');
@@ -1786,7 +2078,7 @@ export default function App() {
               const logoUrl = getLogoUrl(r.name);
               return {
                 position: [r.lat, r.lng],
-                icon: logoUrl ? createLogoIcon(logoUrl) : createRetailerIcon(r.category),
+                icon: logoUrl ? createLogoIcon(logoUrl, r.name) : createRetailerIcon(r.category),
                 idx: i,
                 name: r.name,
                 category: r.category,

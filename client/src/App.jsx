@@ -1382,13 +1382,23 @@ export default function App() {
           return { fromPt, toPt, iconW, iconH };
         });
 
-        // Pass 1: Draw all connector lines (behind markers)
-        connectorPts.forEach(({ fromPt, toPt }) => {
-          const x1 = fromPt.x * scaleX, y1 = fromPt.y * scaleY;
+        // Pass 1: Draw all connector lines (clipped to marker edge so tail attaches)
+        connectorPts.forEach(({ fromPt, toPt, iconW, iconH }) => {
+          // Clip line start from marker center to marker box edge
+          const dx = toPt.x - fromPt.x;
+          const dy = toPt.y - fromPt.y;
+          const halfW = iconW / 2;
+          const halfH = iconH / 2;
+          // Find where the line from center to target exits the marker box
+          let t = 1; // parameter along line; 0 = center, 1 = target
+          if (dx !== 0) t = Math.min(t, halfW / Math.abs(dx));
+          if (dy !== 0) t = Math.min(t, halfH / Math.abs(dy));
+          const edgeX = (fromPt.x + dx * t) * scaleX;
+          const edgeY = (fromPt.y + dy * t) * scaleY;
           const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
 
           ctx.beginPath();
-          ctx.moveTo(x1, y1);
+          ctx.moveTo(edgeX, edgeY);
           ctx.lineTo(x2, y2);
           ctx.strokeStyle = 'rgba(200, 16, 46, 0.85)';
           ctx.lineWidth = 4 * scaleX;
@@ -1739,7 +1749,7 @@ export default function App() {
               radius={parseFloat(radius) * 1609.34}
               pathOptions={{
                 color: '#c8a951',
-                weight: 2,
+                weight: 4,
                 opacity: 0.7,
                 fillColor: '#c8a951',
                 fillOpacity: 0.04,

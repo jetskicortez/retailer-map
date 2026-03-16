@@ -1604,18 +1604,16 @@ export default function App() {
         propLatLng,
         ...data.retailers.map((r) => [r.lat, r.lng]),
       ];
-      // Fit bounds with generous padding so logos aren't clipped at edges
+      // Fit bounds to determine the right zoom level
       map.fitBounds(allPts, {
         padding: [60, 60],
         maxZoom: 15,
         animate: false,
       });
 
-      // Nudge center toward subject property (weighted center: 60% property, 40% bounds center)
-      const boundsCenter = map.getCenter();
-      const weightedLat = propLatLng[0] * 0.6 + boundsCenter.lat * 0.4;
-      const weightedLng = propLatLng[1] * 0.6 + boundsCenter.lng * 0.4;
-      map.setView([weightedLat, weightedLng], map.getZoom(), { animate: false });
+      // Re-center on subject property so the radius circle is centered in export
+      const fitZoom = map.getZoom();
+      map.setView(propLatLng, fitZoom, { animate: false });
     }
 
     // Wait for tiles to load and layout to settle

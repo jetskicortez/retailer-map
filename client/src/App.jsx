@@ -41,10 +41,21 @@ function getCategoryConfig(category) {
 }
 
 // ── SVG icon builders ────────────────────────────────────────────
-function createPropertyIcon() {
+function getStreetAddress(fullAddress) {
+  if (!fullAddress) return 'SUBJECT PROPERTY';
+  // Extract street portion: everything before the city/state/zip
+  // Typically "123 Main St, City, ST 12345" → "123 Main St"
+  const parts = fullAddress.split(',');
+  return parts[0].trim() || 'SUBJECT PROPERTY';
+}
+
+function createPropertyIcon(streetAddress) {
+  const label = streetAddress || 'SUBJECT PROPERTY';
+  // Estimate label width: ~7.5px per character at the label font size, min 140px
+  const labelW = Math.max(140, label.length * 7.5 + 24);
   const html = `<div class="property-marker">
     <div class="property-pulse"></div>
-    <div class="property-label">SUBJECT PROPERTY</div>
+    <div class="property-label">${label}</div>
     <div class="property-pin">
       <svg width="36" height="46" viewBox="0 0 36 46" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -64,12 +75,12 @@ function createPropertyIcon() {
       </svg>
     </div>
   </div>`;
-  // Total height: ~30px label + 46px pin = 76px; width driven by label (~140px)
+  // Total height: ~30px label + 46px pin = 76px
   return L.divIcon({
     html,
     className: '',
-    iconSize: [140, 76],
-    iconAnchor: [70, 76],
+    iconSize: [labelW, 76],
+    iconAnchor: [labelW / 2, 76],
     popupAnchor: [0, -76],
   });
 }
@@ -646,7 +657,7 @@ function getLogoUrl(retailerName) {
   if (!domain && !file) return null;
   const localUrl = file ? `/logos/${file}` : null;
   const brandfetchUrl = domain
-    ? `https://cdn.brandfetch.io/${domain}/w/200/h/112/fallback/404?c=${BRANDFETCH_ID}`
+    ? `https://cdn.brandfetch.io/${domain}/w/200/h/112/theme/light/fallback/404?c=${BRANDFETCH_ID}`
     : null;
   // Return BrandFetch as primary, local as fallback
   return brandfetchUrl || localUrl;
@@ -1604,18 +1615,16 @@ export default function App() {
         propLatLng,
         ...data.retailers.map((r) => [r.lat, r.lng]),
       ];
-      // Fit bounds with generous padding so logos aren't clipped at edges
+      // Fit bounds to determine the right zoom level
       map.fitBounds(allPts, {
         padding: [60, 60],
         maxZoom: 15,
         animate: false,
       });
 
-      // Nudge center toward subject property (weighted center: 60% property, 40% bounds center)
-      const boundsCenter = map.getCenter();
-      const weightedLat = propLatLng[0] * 0.6 + boundsCenter.lat * 0.4;
-      const weightedLng = propLatLng[1] * 0.6 + boundsCenter.lng * 0.4;
-      map.setView([weightedLat, weightedLng], map.getZoom(), { animate: false });
+      // Re-center on subject property so the radius circle is centered in export
+      const fitZoom = map.getZoom();
+      map.setView(propLatLng, fitZoom, { animate: false });
     }
 
     // Wait for tiles to load and layout to settle
@@ -2054,7 +2063,7 @@ export default function App() {
           {data && (
             <Marker
               position={[data.property.lat, data.property.lng]}
-              icon={createPropertyIcon()}
+              icon={createPropertyIcon(getStreetAddress(data.property.display))}
               zIndexOffset={10000}
             >
               <Popup>

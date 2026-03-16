@@ -960,7 +960,7 @@ export default function App() {
   const [activeCategories, setActiveCategories] = useState(new Set());
   const [activeChainSizes, setActiveChainSizes] = useState(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const markerRefs = useRef({});
   const connectorDataRef = useRef([]);

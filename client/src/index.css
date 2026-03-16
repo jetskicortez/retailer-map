@@ -577,6 +577,10 @@ body {
   background: #f2efe9;
 }
 
+.map-panel.satellite .leaflet-container {
+  background: #1a2e1a;
+}
+
 /* Map Controls */
 .map-controls {
   position: absolute;
@@ -652,18 +656,18 @@ body {
 }
 
 .property-label {
-  background: #0f1923;
-  color: #c9a84c;
+  background: #1a1a1a;
+  color: #ffffff;
   font-family: 'DM Sans', sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  padding: 4px 10px;
-  border-radius: 4px;
-  border: 1.5px solid #c9a84c;
+  padding: 5px 12px;
+  border-radius: 3px;
+  border: 2px solid #c9a84c;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
   margin-bottom: 2px;
   text-align: center;
 }
@@ -693,15 +697,15 @@ body {
 
 /* ---- Logo Markers ---- */
 .logo-marker {
-  border-radius: 10px;
+  border-radius: 4px;
   background: #ffffff !important;
-  border: 1.5px solid #c0c0c0;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0,0,0,0.04);
+  border: 1.5px solid #d0d0d0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0,0,0,0.06);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 6px;
+  padding: 8px;
   cursor: grab;
 }
 
@@ -712,7 +716,7 @@ body {
   display: block;
   pointer-events: none;
   background: #ffffff;
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 /* Let touch events pass through to Leaflet's drag handler */
@@ -741,26 +745,26 @@ body {
 /* ---- Smart Cluster Grid Icons ---- */
 .smart-cluster {
   display: grid;
-  gap: 4px;
-  padding: 7px;
+  gap: 5px;
+  padding: 8px;
   background: #ffffff !important;
-  border: 1.5px solid #c0c0c0;
-  border-radius: 10px;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.10), 0 0 0 0.5px rgba(0,0,0,0.04);
+  border: 1.5px solid #d0d0d0;
+  border-radius: 5px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16), 0 0 0 0.5px rgba(0,0,0,0.06);
   position: relative;
   cursor: grab;
 }
 
 .smart-cluster:hover {
   border-color: #999999;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.2);
 }
 
 .sc-cell {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   background: #ffffff !important;
-  border-radius: 5px;
+  border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -769,8 +773,8 @@ body {
 }
 
 .sc-cell img {
-  max-width: 38px;
-  max-height: 38px;
+  max-width: 44px;
+  max-height: 44px;
   object-fit: contain;
   display: block;
   background: #ffffff;
@@ -778,20 +782,20 @@ body {
 }
 
 .sc-cell-text {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   font-family: 'DM Sans', sans-serif;
 }
 
 .sc-count {
   position: absolute;
-  top: -7px;
-  right: -7px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: #666666;
+  top: -8px;
+  right: -8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #444444;
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -800,8 +804,8 @@ body {
   align-items: center;
   justify-content: center;
   line-height: 1;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  border: 1.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  border: 2px solid #fff;
   pointer-events: auto;
 }
 

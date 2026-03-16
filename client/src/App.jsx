@@ -377,9 +377,9 @@ function getLogoUrl(retailerName) {
   return null;
 }
 
-const LOGO_H = 48; // Fixed height for all logo markers
-const LOGO_MIN_W = 48; // Minimum width (square)
-const LOGO_MAX_W = 110; // Maximum width (very wide logos)
+const LOGO_H = 56; // Fixed height for all logo markers
+const LOGO_MIN_W = 56; // Minimum width (square)
+const LOGO_MAX_W = 130; // Maximum width (very wide logos)
 
 // Cache of logo natural dimensions: url → { w, h, aspect }
 const logoDimCache = {};
@@ -406,16 +406,16 @@ function getLogoMarkerW(logoUrl) {
   const cached = logoDimCache[logoUrl];
   if (!cached) return LOGO_MIN_W;
   // Scale width to maintain aspect ratio at fixed height
-  const innerH = LOGO_H - 15; // padding (6px×2) + border (1.5px×2) overhead
-  const naturalW = innerH * cached.aspect + 15; // add back padding + border
+  const innerH = LOGO_H - 19; // padding (8px×2) + border (1.5px×2) overhead
+  const naturalW = innerH * cached.aspect + 19; // add back padding + border
   return Math.max(LOGO_MIN_W, Math.min(LOGO_MAX_W, Math.round(naturalW)));
 }
 
 function createLogoIcon(logoUrl) {
   const markerW = getLogoMarkerW(logoUrl);
-  // Inner dimensions after padding (6px) and border (1.5px) on each side
-  const innerW = markerW - 15;
-  const innerH = LOGO_H - 15;
+  // Inner dimensions after padding (8px) and border (1.5px) on each side
+  const innerW = markerW - 19;
+  const innerH = LOGO_H - 19;
 
   return L.divIcon({
     html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="this.style.display='none'" /></div>`,
@@ -432,9 +432,9 @@ function createLogoIcon(logoUrl) {
 // so the subject property is never blocked and the map stays clean.
 
 const MARKER_PAD = 8;
-const CLUSTER_CELL = 44;       // px per logo cell inside cluster grid
-const CLUSTER_GAP = 4;         // px gap between cells
-const CLUSTER_PAD = 7;         // px padding inside cluster border
+const CLUSTER_CELL = 52;       // px per logo cell inside cluster grid
+const CLUSTER_GAP = 5;         // px gap between cells
+const CLUSTER_PAD = 8;         // px padding inside cluster border
 const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
 const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
 const MIN_CLUSTER_SIZE = 3;    // minimum items to form a cluster (pairs just push apart)
@@ -559,7 +559,7 @@ function createClusterGridIcon(cluster, childrenData) {
     if (!child) return '<div class="sc-cell"></div>';
     const logoUrl = child.logoUrl;
     if (logoUrl) {
-      return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="38" height="38" style="object-fit:contain;" onerror="this.style.display='none'" /></div>`;
+      return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="44" height="44" style="object-fit:contain;" onerror="this.style.display='none'" /></div>`;
     }
     // No logo — show initials with category color background
     const cfg = getCategoryConfig(child.category || 'Other');
@@ -803,13 +803,13 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
             to: Array.isArray(cluster.centroidLatLng) ? cluster.centroidLatLng : [cluster.centroidLatLng.lat, cluster.centroidLatLng.lng],
           });
 
-          // Solid thin line (visible on screen via SVG renderer)
+          // Clean solid connector line
           const line = L.polyline(
             [markerLatLng, cluster.centroidLatLng],
             {
-              weight: 1.2,
-              color: '#999999',
-              opacity: 0.5,
+              weight: 1.5,
+              color: '#333333',
+              opacity: 0.7,
               interactive: false,
               renderer: svgRenderer,
             }
@@ -818,12 +818,12 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
           // Small filled dot at the actual location
           const dot = L.circleMarker(cluster.centroidLatLng, {
-            radius: 3.5,
-            fillColor: '#888888',
-            fillOpacity: 0.8,
+            radius: 4,
+            fillColor: '#333333',
+            fillOpacity: 0.9,
             stroke: true,
             color: '#ffffff',
-            weight: 1.5,
+            weight: 2,
             interactive: false,
             renderer: svgRenderer,
           });
@@ -885,6 +885,42 @@ function MapController({ flyTo, fitBounds }) {
       map.flyTo(flyTo, 16, { duration: 0.8 });
     }
   }, [flyTo, map]);
+  return null;
+}
+
+// ── Tile layer URLs ──────────────────────────────────────────────
+const TILE_LAYERS = {
+  street: {
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri &mdash; Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    subdomains: undefined,
+  },
+};
+
+function TileLayerSwitcher({ mapStyle }) {
+  const map = useMap();
+  const layerRef = useRef(null);
+
+  useEffect(() => {
+    if (layerRef.current) {
+      map.removeLayer(layerRef.current);
+    }
+    const cfg = TILE_LAYERS[mapStyle] || TILE_LAYERS.street;
+    const opts = { attribution: cfg.attribution, maxZoom: 20 };
+    if (cfg.subdomains) opts.subdomains = cfg.subdomains;
+    layerRef.current = L.tileLayer(cfg.url, opts).addTo(map);
+    // Ensure tile layer is behind markers
+    layerRef.current.bringToBack();
+    return () => {
+      if (layerRef.current) map.removeLayer(layerRef.current);
+    };
+  }, [mapStyle, map]);
+
   return null;
 }
 
@@ -959,6 +995,7 @@ export default function App() {
   const [activeCategories, setActiveCategories] = useState(new Set());
   const [activeChainSizes, setActiveChainSizes] = useState(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mapStyle, setMapStyle] = useState('street'); // 'street' or 'satellite'
 
   const markerRefs = useRef({});
   const connectorDataRef = useRef([]);
@@ -1162,8 +1199,8 @@ export default function App() {
     const originals = [];
     imgs.forEach((img) => {
       if (!img.naturalWidth || !img.naturalHeight) return;
-      const boxW = img.clientWidth || parseInt(img.style.width) || 36;
-      const boxH = img.clientHeight || parseInt(img.style.height) || 36;
+      const boxW = img.clientWidth || parseInt(img.style.width) || 44;
+      const boxH = img.clientHeight || parseInt(img.style.height) || 44;
       const imgRatio = img.naturalWidth / img.naturalHeight;
       const boxRatio = boxW / boxH;
       let drawW, drawH;
@@ -1287,6 +1324,7 @@ export default function App() {
     const fixed = fixObjectFitForExport(panel);
     try {
       // Capture at 3× for 300 DPI quality (1100×3 = 3300, 850×3 = 2550)
+      const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
       const rawCanvas = await html2canvas(panel, {
         width: CAPTURE_W,
         height: CAPTURE_H,
@@ -1295,7 +1333,7 @@ export default function App() {
         scale: 3,
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff',
+        backgroundColor: bgColor,
       });
 
       // Guarantee output is exactly landscape letter at 300 DPI
@@ -1303,7 +1341,7 @@ export default function App() {
       outCanvas.width = EXPORT_W;   // 3300
       outCanvas.height = EXPORT_H;  // 2550
       const ctx = outCanvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
       ctx.drawImage(rawCanvas, 0, 0, EXPORT_W, EXPORT_H);
 
@@ -1317,22 +1355,22 @@ export default function App() {
           const x1 = fromPt.x * scaleX, y1 = fromPt.y * scaleY;
           const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
 
-          // Thin solid line
+          // Clean solid connector line
           ctx.beginPath();
           ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
-          ctx.strokeStyle = 'rgba(153, 153, 153, 0.5)';
-          ctx.lineWidth = 1.2 * scaleX;
+          ctx.strokeStyle = 'rgba(51, 51, 51, 0.7)';
+          ctx.lineWidth = 1.5 * scaleX;
           ctx.stroke();
 
           // Filled dot at the actual location
-          const dotR = 3.5 * scaleX;
+          const dotR = 4 * scaleX;
           ctx.beginPath();
           ctx.arc(x2, y2, dotR, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(136, 136, 136, 0.8)';
+          ctx.fillStyle = 'rgba(51, 51, 51, 0.9)';
           ctx.fill();
           ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.5 * scaleX;
+          ctx.lineWidth = 2 * scaleX;
           ctx.stroke();
         });
       }
@@ -1357,7 +1395,7 @@ export default function App() {
         }
       }
     }
-  }, [data]);
+  }, [data, mapStyle]);
 
   // Export map as high-res PNG (8.5×11 landscape)
   const handleExportImage = useCallback(async () => {
@@ -1616,14 +1654,20 @@ export default function App() {
       </aside>
 
       {/* ─── Map Panel ─── */}
-      <div className="map-panel" ref={mapPanelRef}>
+      <div className={`map-panel${mapStyle === 'satellite' ? ' satellite' : ''}`} ref={mapPanelRef}>
         {data && (
           <div className="map-controls">
+            <button
+              className="map-btn"
+              onClick={() => setMapStyle((s) => s === 'street' ? 'satellite' : 'street')}
+            >
+              {mapStyle === 'street' ? 'Satellite' : 'Street Map'}
+            </button>
             <button className="map-btn" onClick={handleFitAll}>
-              Fit All Markers
+              Fit All
             </button>
             <button className="map-btn" onClick={handleClear}>
-              Clear Map
+              Clear
             </button>
           </div>
         )}
@@ -1635,12 +1679,7 @@ export default function App() {
           ref={mapRef}
           tap={false}
         >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-            subdomains="abcd"
-            maxZoom={20}
-          />
+          <TileLayerSwitcher mapStyle={mapStyle} />
           <MapController flyTo={flyTo} fitBounds={fitBounds} />
 
           {/* Subject property marker (highest z-index) */}

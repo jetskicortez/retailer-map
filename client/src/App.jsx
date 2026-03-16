@@ -959,7 +959,6 @@ export default function App() {
   // Filter state
   const [activeCategories, setActiveCategories] = useState(new Set());
   const [activeChainSizes, setActiveChainSizes] = useState(new Set());
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const markerRefs = useRef({});
@@ -1445,6 +1444,7 @@ export default function App() {
 
         {/* Form */}
         <div className="form-section">
+          <div className="step-label"><span className="step-number">1</span> Search</div>
           <div className="form-group">
             <label className="form-label">Address</label>
             <input
@@ -1456,32 +1456,34 @@ export default function App() {
               onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
             />
           </div>
-          <div className="form-group">
-            <label className="form-label">Radius</label>
-            <select
-              className="form-select"
-              value={radius}
-              onChange={(e) => setRadius(e.target.value)}
-            >
-              <option value="1">1 Mile</option>
-              <option value="2">2 Miles</option>
-              <option value="3">3 Miles</option>
-              <option value="5">5 Miles</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Property Type</label>
-            <select
-              className="form-select"
-              value={propertyType}
-              onChange={(e) => setPropertyType(e.target.value)}
-            >
-              {PROPERTY_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+          <div className="form-row">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Radius</label>
+              <select
+                className="form-select"
+                value={radius}
+                onChange={(e) => setRadius(e.target.value)}
+              >
+                <option value="1">1 Mile</option>
+                <option value="2">2 Miles</option>
+                <option value="3">3 Miles</option>
+                <option value="5">5 Miles</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label">Property Type</label>
+              <select
+                className="form-select"
+                value={propertyType}
+                onChange={(e) => setPropertyType(e.target.value)}
+              >
+                {PROPERTY_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <button
             className="btn-generate"
@@ -1491,6 +1493,63 @@ export default function App() {
             {loading ? 'Generating\u2026' : 'Generate Map'}
           </button>
           {error && <div className="error-msg">{error}</div>}
+        </div>
+
+        {/* Filter Section */}
+        <div className={`filter-section${data ? '' : ' disabled-section'}`}>
+          <div className="step-label"><span className="step-number">2</span> Filter Results</div>
+          {data ? (
+            <div className="filter-body">
+              <div className="filter-summary">
+                <span className="list-count">
+                  {filteredRetailers.length}
+                  {filteredRetailers.length !== data.retailers.length
+                    ? ` / ${data.retailers.length}`
+                    : ''}{' '}
+                  retailers found
+                </span>
+                {(activeCategories.size > 0 || activeChainSizes.size > 0) && (
+                  <button className="filter-clear" onClick={clearFilters}>
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="filter-group">
+                <div className="filter-label">Type</div>
+                <div className="filter-chips">
+                  {availableChainSizes.map((size) => (
+                    <button
+                      key={size}
+                      className={`filter-chip${activeChainSizes.has(size) ? ' active' : ''}`}
+                      onClick={() => toggleChainSize(size)}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="filter-group">
+                <div className="filter-label">Category</div>
+                <div className="filter-chips">
+                  {availableCategories.map((cat) => {
+                    const cfg = getCategoryConfig(cat);
+                    return (
+                      <button
+                        key={cat}
+                        className={`filter-chip${activeCategories.has(cat) ? ' active' : ''}`}
+                        style={activeCategories.has(cat) ? { borderColor: cfg.color, background: cfg.color + '22' } : {}}
+                        onClick={() => toggleCategory(cat)}
+                      >
+                        {cfg.emoji} {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="step-hint">Generate a map to see filter options</div>
+          )}
         </div>
 
         {/* Retailer List */}
@@ -1506,79 +1565,6 @@ export default function App() {
                     : ''}{' '}
                   found
                 </span>
-              </div>
-
-              {/* Filters */}
-              <div className="filter-section">
-                <button
-                  className="filter-toggle"
-                  onClick={() => setFiltersOpen((prev) => !prev)}
-                >
-                  <span className="filter-toggle-label">
-                    Filters
-                    {(activeCategories.size > 0 || activeChainSizes.size > 0) && (
-                      <span className="filter-active-count">
-                        {activeCategories.size + activeChainSizes.size}
-                      </span>
-                    )}
-                  </span>
-                  <svg
-                    className={`filter-toggle-arrow${filtersOpen ? ' open' : ''}`}
-                    width="10"
-                    height="6"
-                    viewBox="0 0 10 6"
-                    fill="none"
-                  >
-                    <path
-                      d="M1 1L5 5L9 1"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                {filtersOpen && (
-                  <div className="filter-body">
-                    <div className="filter-group">
-                      <div className="filter-label">Type</div>
-                      <div className="filter-chips">
-                        {availableChainSizes.map((size) => (
-                          <button
-                            key={size}
-                            className={`filter-chip${activeChainSizes.has(size) ? ' active' : ''}`}
-                            onClick={() => toggleChainSize(size)}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="filter-group">
-                      <div className="filter-label">Category</div>
-                      <div className="filter-chips">
-                        {availableCategories.map((cat) => {
-                          const cfg = getCategoryConfig(cat);
-                          return (
-                            <button
-                              key={cat}
-                              className={`filter-chip${activeCategories.has(cat) ? ' active' : ''}`}
-                              style={activeCategories.has(cat) ? { borderColor: cfg.color, background: cfg.color + '22' } : {}}
-                              onClick={() => toggleCategory(cat)}
-                            >
-                              {cfg.emoji} {cat}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    {(activeCategories.size > 0 || activeChainSizes.size > 0) && (
-                      <button className="filter-clear" onClick={clearFilters}>
-                        Clear Filters
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
 
               <div className="retailer-list">
@@ -1614,20 +1600,12 @@ export default function App() {
                 })}
               </div>
             </>
-          ) : (
-            <div className="empty-state">
-              <div className="empty-icon">{'\u{1F5FA}'}</div>
-              <div className="empty-title">No Map Generated</div>
-              <div className="empty-desc">
-                Enter a property address, select a radius and property type, then
-                click Generate Map.
-              </div>
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* Export */}
-        <div className="export-section">
+        <div className={`export-section${data ? '' : ' disabled-section'}`}>
+          <div className="step-label"><span className="step-number">3</span> Export</div>
           <div className="export-buttons">
             <button
               className="btn-export primary"

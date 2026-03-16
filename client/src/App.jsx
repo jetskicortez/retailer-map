@@ -1427,10 +1427,20 @@ export default function App() {
       )}
 
       {/* ─── Sidebar ─── */}
-      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+      <aside className={`sidebar${sidebarOpen ? ' open' : ' collapsed'}`}>
         <div className="sidebar-header">
-          <div className="brand-name">The Colony Agency</div>
-          <div className="brand-subtitle">Retailer Map Generator</div>
+          <div className="brand-text">
+            <div className="brand-name">The Colony Agency</div>
+            <div className="brand-subtitle">Retailer Map Generator</div>
+          </div>
+          <button
+            className="sidebar-toggle-btn"
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            {sidebarOpen ? '\u2039' : '\u203A'}
+          </button>
         </div>
 
         {/* Form */}

@@ -947,7 +947,6 @@ function exportCSV(property, retailers) {
 export default function App() {
   const [address, setAddress] = useState('');
   const [radius, setRadius] = useState('3');
-  const [propertyType, setPropertyType] = useState(PROPERTY_TYPES[0]);
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [error, setError] = useState('');
@@ -1114,7 +1113,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [address, radius, propertyType]);
+  }, [address, radius]);
 
   // Sidebar card click → fly to marker and open popup
   const handleCardClick = useCallback((idx) => {
@@ -1456,34 +1455,18 @@ export default function App() {
               onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
             />
           </div>
-          <div className="form-row">
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Radius</label>
-              <select
-                className="form-select"
-                value={radius}
-                onChange={(e) => setRadius(e.target.value)}
-              >
-                <option value="1">1 Mile</option>
-                <option value="2">2 Miles</option>
-                <option value="3">3 Miles</option>
-                <option value="5">5 Miles</option>
-              </select>
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Property Type</label>
-              <select
-                className="form-select"
-                value={propertyType}
-                onChange={(e) => setPropertyType(e.target.value)}
-              >
-                {PROPERTY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="form-group">
+            <label className="form-label">Radius</label>
+            <select
+              className="form-select"
+              value={radius}
+              onChange={(e) => setRadius(e.target.value)}
+            >
+              <option value="1">1 Mile</option>
+              <option value="2">2 Miles</option>
+              <option value="3">3 Miles</option>
+              <option value="5">5 Miles</option>
+            </select>
           </div>
           <button
             className="btn-generate"

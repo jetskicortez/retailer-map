@@ -723,6 +723,9 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
       const propLL = L.latLng(propertyLatLng[0], propertyLatLng[1]);
 
+      // O(1) lookup map for children by idx
+      const childByIdx = new Map(children.filter(Boolean).map((c) => [c.idx, c]));
+
       // Build item list
       const items = children.map((child) => ({
         position: L.latLng(child.position[0], child.position[1]),
@@ -753,7 +756,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
         if (cluster.type === 'single') {
           const item = cluster.items[0];
-          const child = children.find((c) => c && c.idx === item.idx);
+          const child = childByIdx.get(item.idx);
           if (!child) return;
 
           const marker = L.marker(markerLatLng, { icon: child.icon, draggable: true });
@@ -775,8 +778,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           const marker = L.marker(markerLatLng, { icon, draggable: true });
 
           const names = cluster.items.map((item) => {
-            const child = children.find((c) => c && c.idx === item.idx);
-            return child?.name || '';
+            return childByIdx.get(item.idx)?.name || '';
           }).filter(Boolean);
           marker.bindPopup(
             `<div class="popup-name">${names.length} Retailers</div>` +
@@ -804,26 +806,13 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
         // Draw connector line from marker to actual map location
         if (isDisplaced) {
-          // Get the icon size for this marker/cluster for export masking
-          let iconW, iconH;
-          if (cluster.type === 'single') {
-            const child = children.find((c) => c && c.idx === cluster.items[0].idx);
-            iconW = child?.icon?.options?.iconSize?.[0] || LOGO_MIN_W;
-            iconH = child?.icon?.options?.iconSize?.[1] || LOGO_H;
-          } else {
-            // Cluster grid — compute from createClusterGridIcon logic
-            const cols = cluster.items.length <= 3 ? cluster.items.length : Math.ceil(Math.sqrt(cluster.items.length));
-            const rows = Math.ceil(cluster.items.length / cols);
-            iconW = cols * CLUSTER_CELL + (cols - 1) * CLUSTER_GAP + CLUSTER_PAD * 2;
-            iconH = rows * CLUSTER_CELL + (rows - 1) * CLUSTER_GAP + CLUSTER_PAD * 2;
-          }
-
           // Store data for canvas-based export drawing
+          // cluster.w / cluster.h already include padding from buildClusters
           connectors.push({
             from: Array.isArray(markerLatLng) ? markerLatLng : [markerLatLng.lat, markerLatLng.lng],
-            to: Array.isArray(cluster.centroidLatLng) ? cluster.centroidLatLng : [cluster.centroidLatLng.lat, cluster.centroidLatLng.lng],
-            iconW,
-            iconH,
+            to: cluster.centroidLatLng, // already an array from buildClusters
+            iconW: cluster.w,
+            iconH: cluster.h,
           });
 
           // Connector line — colony red, 4pt weight, rendered below markers
@@ -1381,18 +1370,22 @@ export default function App() {
       if (map && connectorDataRef.current.length > 0) {
         const scaleX = EXPORT_W / CAPTURE_W;
         const scaleY = EXPORT_H / CAPTURE_H;
-        // Scale from rawCanvas coords (CAPTURE_W * 3) to output coords (EXPORT_W)
-        const rawToOutX = EXPORT_W / rawCanvas.width;
-        const rawToOutY = EXPORT_H / rawCanvas.height;
+        const rawScaleX = rawCanvas.width / CAPTURE_W;
+        const rawScaleY = rawCanvas.height / CAPTURE_H;
+        const EXPORT_MARKER_PAD = 12; // Extra padding around marker box for re-stamping
 
-        // Draw all connector lines
-        connectorDataRef.current.forEach(({ from, to }) => {
+        // Pre-compute all connector screen coordinates
+        const connectorPts = connectorDataRef.current.map(({ from, to, iconW, iconH }) => {
           const fromPt = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
           const toPt = map.latLngToContainerPoint(L.latLng(to[0], to[1]));
+          return { fromPt, toPt, iconW, iconH };
+        });
+
+        // Pass 1: Draw all connector lines (behind markers)
+        connectorPts.forEach(({ fromPt, toPt }) => {
           const x1 = fromPt.x * scaleX, y1 = fromPt.y * scaleY;
           const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
 
-          // Connector line — colony red, 4pt weight
           ctx.beginPath();
           ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
@@ -1411,33 +1404,22 @@ export default function App() {
           ctx.stroke();
         });
 
-        // Re-stamp marker/cluster regions from the original capture on top of connectors
-        // This ensures logos cover the connector lines where they overlap
-        connectorDataRef.current.forEach(({ from, iconW, iconH }) => {
-          const fromPt = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
-          // Marker box in container coords (icon anchor is center)
-          const pad = 12; // Extra padding around marker box
-          const boxX = fromPt.x - iconW / 2 - pad;
-          const boxY = fromPt.y - iconH / 2 - pad;
-          const boxW = iconW + pad * 2;
-          const boxH = iconH + pad * 2;
+        // Pass 2: Re-stamp marker/cluster regions from original capture on top
+        connectorPts.forEach(({ fromPt, iconW, iconH }) => {
+          const boxX = fromPt.x - iconW / 2 - EXPORT_MARKER_PAD;
+          const boxY = fromPt.y - iconH / 2 - EXPORT_MARKER_PAD;
+          const boxW = iconW + EXPORT_MARKER_PAD * 2;
+          const boxH = iconH + EXPORT_MARKER_PAD * 2;
 
-          // Source rect in rawCanvas pixel coords (rawCanvas is CAPTURE_W * scale)
-          const srcX = boxX * (rawCanvas.width / CAPTURE_W);
-          const srcY = boxY * (rawCanvas.height / CAPTURE_H);
-          const srcW = boxW * (rawCanvas.width / CAPTURE_W);
-          const srcH = boxH * (rawCanvas.height / CAPTURE_H);
+          const srcX = boxX * rawScaleX;
+          const srcY = boxY * rawScaleY;
+          const srcW = boxW * rawScaleX;
+          const srcH = boxH * rawScaleY;
 
-          // Dest rect in output coords
-          const dstX = boxX * scaleX;
-          const dstY = boxY * scaleY;
-          const dstW = boxW * scaleX;
-          const dstH = boxH * scaleY;
-
-          // Clamp to canvas bounds
           if (srcX >= 0 && srcY >= 0 && srcW > 0 && srcH > 0 &&
               srcX + srcW <= rawCanvas.width && srcY + srcH <= rawCanvas.height) {
-            ctx.drawImage(rawCanvas, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
+            ctx.drawImage(rawCanvas, srcX, srcY, srcW, srcH,
+              boxX * scaleX, boxY * scaleY, boxW * scaleX, boxH * scaleY);
           }
         });
       }

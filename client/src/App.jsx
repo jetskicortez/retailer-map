@@ -448,18 +448,12 @@ function getClusterPadding(zoom) {
 }
 
 // SVG renderer for connecting lines (html2canvas captures SVG DOM elements reliably)
-// Connector SVG renderer — created lazily per map to ensure pane exists
-let _svgRendererCache = null;
-function getConnectorRenderer(map) {
-  if (!_svgRendererCache) {
-    // Ensure pane exists
-    if (!map.getPane('connectorPane')) {
-      const pane = map.createPane('connectorPane');
-      pane.style.zIndex = '350';
-    }
-    _svgRendererCache = L.svg({ padding: 0.5, pane: 'connectorPane' });
+// Connector pane — created lazily, sits below markers
+function ensureConnectorPane(map) {
+  if (!map.getPane('connectorPane')) {
+    const pane = map.createPane('connectorPane');
+    pane.style.zIndex = '350'; // Below overlayPane (400) and markerPane (600)
   }
-  return _svgRendererCache;
 }
 
 // ── Step 1: Group nearby markers into clusters (pixel space) ─────
@@ -695,8 +689,8 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
   useEffect(() => {
     // Ensure connector pane exists (below markers)
-    getConnectorRenderer(map);
-    const lines = L.layerGroup().addTo(map);
+    ensureConnectorPane(map);
+    const lines = L.layerGroup({ pane: 'connectorPane' }).addTo(map);
     const layers = L.layerGroup().addTo(map);
     layerGroupRef.current = layers;
     linesGroupRef.current = lines;
@@ -824,7 +818,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
               color: '#c8102e',
               opacity: 0.85,
               interactive: false,
-              renderer: getConnectorRenderer(map),
+              pane: 'connectorPane',
             }
           );
           lines.addLayer(line);
@@ -838,7 +832,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
             color: '#ffffff',
             weight: 2.5,
             interactive: false,
-            renderer: getConnectorRenderer(map),
+            pane: 'connectorPane',
           });
           lines.addLayer(dot);
         }

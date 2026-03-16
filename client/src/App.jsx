@@ -1330,9 +1330,21 @@ export default function App() {
 
     const fixed = fixObjectFitForExport(panel);
     try {
-      // Capture at 3× for 300 DPI quality (1100×3 = 3300, 850×3 = 2550)
+      // ── Two-pass capture for correct z-ordering ──
+      // Pass 1: Capture map tiles only (hide markers so connectors can go behind them)
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
-      const rawCanvas = await html2canvas(panel, {
+      const markerPane = map?.getPane('markerPane');
+      const popupPane = map?.getPane('popupPane');
+      const tooltipPane = map?.getPane('tooltipPane');
+      const connectorPane = map?.getPane('connectorPane');
+
+      // Hide markers + connectors for tiles-only capture
+      if (markerPane) markerPane.style.display = 'none';
+      if (popupPane) popupPane.style.display = 'none';
+      if (tooltipPane) tooltipPane.style.display = 'none';
+      if (connectorPane) connectorPane.style.display = 'none';
+
+      const tilesCanvas = await html2canvas(panel, {
         width: CAPTURE_W,
         height: CAPTURE_H,
         windowWidth: CAPTURE_W,
@@ -1343,16 +1355,42 @@ export default function App() {
         backgroundColor: bgColor,
       });
 
-      // Guarantee output is exactly landscape letter at 300 DPI
+      // Pass 2: Capture markers only (show markers, hide tiles for transparent overlay)
+      if (markerPane) markerPane.style.display = '';
+      if (popupPane) popupPane.style.display = '';
+      if (tooltipPane) tooltipPane.style.display = '';
+      // Keep connectorPane hidden — we draw connectors manually
+
+      const tilePane = map?.getPane('tilePane');
+      if (tilePane) tilePane.style.display = 'none';
+
+      const markersCanvas = await html2canvas(panel, {
+        width: CAPTURE_W,
+        height: CAPTURE_H,
+        windowWidth: CAPTURE_W,
+        windowHeight: CAPTURE_H,
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null, // transparent
+      });
+
+      // Restore all panes
+      if (tilePane) tilePane.style.display = '';
+      if (connectorPane) connectorPane.style.display = '';
+
+      // ── Composite: tiles → connectors → markers ──
       const outCanvas = document.createElement('canvas');
       outCanvas.width = EXPORT_W;   // 3300
       outCanvas.height = EXPORT_H;  // 2550
       const ctx = outCanvas.getContext('2d');
+
+      // Layer 1: Map tiles
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, EXPORT_W, EXPORT_H);
-      ctx.drawImage(rawCanvas, 0, 0, EXPORT_W, EXPORT_H);
+      ctx.drawImage(tilesCanvas, 0, 0, EXPORT_W, EXPORT_H);
 
-      // Draw connector lines directly on canvas (html2canvas can't capture Leaflet SVG overlay)
+      // Layer 2: Connector lines (below markers)
       if (map && connectorDataRef.current.length > 0) {
         const scaleX = EXPORT_W / CAPTURE_W;
         const scaleY = EXPORT_H / CAPTURE_H;
@@ -1381,6 +1419,9 @@ export default function App() {
           ctx.stroke();
         });
       }
+
+      // Layer 3: Markers on top
+      ctx.drawImage(markersCanvas, 0, 0, EXPORT_W, EXPORT_H);
 
       return outCanvas;
     } finally {

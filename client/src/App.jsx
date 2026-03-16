@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   MapContainer,
-  TileLayer,
   Marker,
   Popup,
   useMap,
@@ -449,7 +448,19 @@ function getClusterPadding(zoom) {
 }
 
 // SVG renderer for connecting lines (html2canvas captures SVG DOM elements reliably)
-const svgRenderer = L.svg ? L.svg({ padding: 0.5 }) : undefined;
+// Connector SVG renderer — created lazily per map to ensure pane exists
+let _svgRendererCache = null;
+function getConnectorRenderer(map) {
+  if (!_svgRendererCache) {
+    // Ensure pane exists
+    if (!map.getPane('connectorPane')) {
+      const pane = map.createPane('connectorPane');
+      pane.style.zIndex = '350';
+    }
+    _svgRendererCache = L.svg({ padding: 0.5, pane: 'connectorPane' });
+  }
+  return _svgRendererCache;
+}
 
 // ── Step 1: Group nearby markers into clusters (pixel space) ─────
 function buildClusters(map, items) {
@@ -683,8 +694,10 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
   const justDragged = useRef(false);
 
   useEffect(() => {
-    const layers = L.layerGroup().addTo(map);
+    // Ensure connector pane exists (below markers)
+    getConnectorRenderer(map);
     const lines = L.layerGroup().addTo(map);
+    const layers = L.layerGroup().addTo(map);
     layerGroupRef.current = layers;
     linesGroupRef.current = lines;
     return () => {
@@ -803,29 +816,29 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
             to: Array.isArray(cluster.centroidLatLng) ? cluster.centroidLatLng : [cluster.centroidLatLng.lat, cluster.centroidLatLng.lng],
           });
 
-          // Clean solid connector line
+          // Connector line — colony red, 4pt weight, rendered below markers
           const line = L.polyline(
             [markerLatLng, cluster.centroidLatLng],
             {
-              weight: 1.5,
-              color: '#333333',
-              opacity: 0.7,
+              weight: 4,
+              color: '#c8102e',
+              opacity: 0.85,
               interactive: false,
-              renderer: svgRenderer,
+              renderer: getConnectorRenderer(map),
             }
           );
           lines.addLayer(line);
 
-          // Small filled dot at the actual location
+          // Filled dot at the actual location
           const dot = L.circleMarker(cluster.centroidLatLng, {
-            radius: 4,
-            fillColor: '#333333',
-            fillOpacity: 0.9,
+            radius: 5,
+            fillColor: '#c8102e',
+            fillOpacity: 1,
             stroke: true,
             color: '#ffffff',
-            weight: 2,
+            weight: 2.5,
             interactive: false,
-            renderer: svgRenderer,
+            renderer: getConnectorRenderer(map),
           });
           lines.addLayer(dot);
         }
@@ -1355,22 +1368,22 @@ export default function App() {
           const x1 = fromPt.x * scaleX, y1 = fromPt.y * scaleY;
           const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
 
-          // Clean solid connector line
+          // Connector line — colony red, 4pt weight
           ctx.beginPath();
           ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
-          ctx.strokeStyle = 'rgba(51, 51, 51, 0.7)';
-          ctx.lineWidth = 1.5 * scaleX;
+          ctx.strokeStyle = 'rgba(200, 16, 46, 0.85)';
+          ctx.lineWidth = 4 * scaleX;
           ctx.stroke();
 
           // Filled dot at the actual location
-          const dotR = 4 * scaleX;
+          const dotR = 5 * scaleX;
           ctx.beginPath();
           ctx.arc(x2, y2, dotR, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(51, 51, 51, 0.9)';
+          ctx.fillStyle = 'rgba(200, 16, 46, 1)';
           ctx.fill();
           ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2 * scaleX;
+          ctx.lineWidth = 2.5 * scaleX;
           ctx.stroke();
         });
       }

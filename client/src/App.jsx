@@ -657,7 +657,7 @@ function getLogoUrl(retailerName) {
   if (!domain && !file) return null;
   const localUrl = file ? `/logos/${file}` : null;
   const brandfetchUrl = domain
-    ? `https://cdn.brandfetch.io/${domain}/w/200/h/112/fallback/404?c=${BRANDFETCH_ID}`
+    ? `https://cdn.brandfetch.io/${domain}/w/200/h/112/theme/light/fallback/404?c=${BRANDFETCH_ID}`
     : null;
   // Return BrandFetch as primary, local as fallback
   return brandfetchUrl || localUrl;

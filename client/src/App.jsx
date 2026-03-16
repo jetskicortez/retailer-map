@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   MapContainer,
+  Circle,
   Marker,
   Popup,
   useMap,
@@ -1730,6 +1731,22 @@ export default function App() {
         >
           <TileLayerSwitcher mapStyle={mapStyle} />
           <MapController flyTo={flyTo} fitBounds={fitBounds} />
+
+          {/* Radius ring */}
+          {data && (
+            <Circle
+              center={[data.property.lat, data.property.lng]}
+              radius={parseFloat(radius) * 1609.34}
+              pathOptions={{
+                color: '#c8a951',
+                weight: 2,
+                opacity: 0.7,
+                fillColor: '#c8a951',
+                fillOpacity: 0.04,
+                dashArray: '8, 6',
+              }}
+            />
+          )}
 
           {/* Subject property marker (highest z-index) */}
           {data && (

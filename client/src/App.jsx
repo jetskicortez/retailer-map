@@ -656,23 +656,23 @@ function getLogoUrl(retailerName) {
   const { domain, file } = _resolveName(normalized);
   if (!domain && !file) return null;
   const localUrl = file ? `/logos/${file}` : null;
-  const brandfetchUrl = domain
-    ? `https://cdn.brandfetch.io/${domain}/w/200/h/112/theme/light/fallback/404?c=${BRANDFETCH_ID}`
-    : null;
-  // Return BrandFetch as primary, local as fallback
-  return brandfetchUrl || localUrl;
+  // Local logos (212+ PNGs) as primary — reliable, no API dependency
+  // BrandFetch proxy at /api/logo/:domain available as fallback
+  // (requires registered domain origin to return real images)
+  const brandfetchUrl = domain ? `/api/logo/${domain}` : null;
+  return localUrl || brandfetchUrl;
 }
 
-// Get local-only fallback URL for onerror handling
-function getLocalLogoUrl(retailerName) {
+// Get BrandFetch proxy fallback URL for onerror handling (when local logo fails)
+function getFallbackLogoUrl(retailerName) {
   const normalized = retailerName.toLowerCase().trim();
-  const { file } = _resolveName(normalized);
-  return file ? `/logos/${file}` : null;
+  const { domain } = _resolveName(normalized);
+  return domain ? `/api/logo/${domain}` : null;
 }
 
 const LOGO_H = 46; // Fixed height for all logo markers
 const LOGO_MIN_W = 36; // Minimum width (narrow/square logos)
-const LOGO_MAX_W = 160; // Maximum width — auto-expand for wider logos
+const LOGO_MAX_W = 150; // Maximum width — auto-expand for wide wordmarks (Dunkin', Subway, etc.)
 
 // Cache of logo natural dimensions: url → { w, h, aspect }
 const logoDimCache = {};
@@ -710,10 +710,10 @@ function createLogoIcon(logoUrl, retailerName) {
   const innerW = markerW - 19;
   const innerH = LOGO_H - 19;
 
-  // Build onerror: try local fallback, then hide if that also fails
-  const localFallback = retailerName ? getLocalLogoUrl(retailerName) : null;
-  const onerror = localFallback
-    ? `this.onerror=function(){this.style.display='none'};this.src='${localFallback}'`
+  // Build onerror: try BrandFetch fallback (since local is primary now), then hide
+  const fallback = retailerName ? getFallbackLogoUrl(retailerName) : null;
+  const onerror = fallback
+    ? `this.onerror=function(){this.style.display='none'};this.src='${fallback}'`
     : "this.style.display='none'";
 
   return L.divIcon({
@@ -864,9 +864,9 @@ function createClusterGridIcon(cluster, childrenData) {
     if (!child) return '<div class="sc-cell"></div>';
     const logoUrl = child.logoUrl;
     if (logoUrl) {
-      const localFb = child.name ? getLocalLogoUrl(child.name) : null;
-      const cellErr = localFb
-        ? `this.onerror=function(){this.style.display='none'};this.src='${localFb}'`
+      const cellFb = child.name ? getFallbackLogoUrl(child.name) : null;
+      const cellErr = cellFb
+        ? `this.onerror=function(){this.style.display='none'};this.src='${cellFb}'`
         : "this.style.display='none'";
       return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="44" height="44" style="object-fit:contain;" onerror="${cellErr}" /></div>`;
     }
@@ -1123,34 +1123,55 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         }
 
         // Draw connector line from marker to actual map location
-        if (isDisplaced) {
+        // Only draw if displacement is short enough to look intentional (not a stray line)
+        const MAX_CONNECTOR_PX = 100;
+        if (isDisplaced && dist <= MAX_CONNECTOR_PX) {
           // Store data for canvas-based export drawing
-          // cluster.w / cluster.h already include padding from buildClusters
           connectors.push({
             from: Array.isArray(markerLatLng) ? markerLatLng : [markerLatLng.lat, markerLatLng.lng],
-            to: cluster.centroidLatLng, // already an array from buildClusters
+            to: cluster.centroidLatLng,
             iconW: cluster.w,
             iconH: cluster.h,
           });
 
-          // Connector line — white 4px
+          // Connector line — white with dark outline for visibility
+          const shadow = L.polyline(
+            [markerLatLng, cluster.centroidLatLng],
+            {
+              weight: 8,
+              color: '#000000',
+              opacity: 0.3,
+              interactive: false,
+              pane: 'connectorPane',
+            }
+          );
+          lines.addLayer(shadow);
           const line = L.polyline(
             [markerLatLng, cluster.centroidLatLng],
             {
               weight: 4,
               color: '#ffffff',
-              opacity: 0.9,
+              opacity: 1,
               interactive: false,
               pane: 'connectorPane',
             }
           );
           lines.addLayer(line);
 
-          // White dot at the actual location
+          // White dot with dark outline at actual location
+          const dotShadow = L.circleMarker(cluster.centroidLatLng, {
+            radius: 7,
+            fillColor: '#000000',
+            fillOpacity: 0.3,
+            stroke: false,
+            interactive: false,
+            pane: 'connectorPane',
+          });
+          lines.addLayer(dotShadow);
           const dot = L.circleMarker(cluster.centroidLatLng, {
             radius: 5,
             fillColor: '#ffffff',
-            fillOpacity: 0.9,
+            fillOpacity: 1,
             stroke: false,
             interactive: false,
             pane: 'connectorPane',
@@ -1650,8 +1671,16 @@ export default function App() {
 
       if (data) {
         const propLatLng = [data.property.lat, data.property.lng];
-        const allPts = [propLatLng, ...data.retailers.map((r) => [r.lat, r.lng])];
-        map.fitBounds(allPts, { padding: [80, 80], maxZoom: 15, animate: false });
+        // Include the full radius ring in bounds so it never gets cut off
+        const radiusMeters = parseFloat(radius) * 1609.34;
+        const degLat = radiusMeters / 111320;
+        const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
+        const ringBounds = [
+          [data.property.lat - degLat, data.property.lng - degLng],
+          [data.property.lat + degLat, data.property.lng + degLng],
+        ];
+        const allPts = [propLatLng, ...ringBounds, ...data.retailers.map((r) => [r.lat, r.lng])];
+        map.fitBounds(allPts, { padding: [100, 100], maxZoom: 15, animate: false });
         const fitZoom = map.getZoom();
 
         // Force a complete pixel-origin reset so SVG overlays (radius ring)
@@ -1663,19 +1692,34 @@ export default function App() {
         map.setView(propLatLng, fitZoom, { animate: false });
       }
     }
-    // Wait for tiles + SVG to render at final position
+    // Wait for tiles to render at final position
     await new Promise((r) => setTimeout(r, 2000));
+
+    // Force SmartClusterLayer to re-render at the export-sized map dimensions
+    // so connector positions are recalculated correctly for the new viewport
+    isExportingRef.current = false;
+    if (map) {
+      // Clear drag overrides so displacement is recalculated fresh
+      map.fire('zoomend');  // clears dragOverrides + triggers re-render
+      map.fire('moveend');  // triggers debouncedRender
+    }
+    await new Promise((r) => setTimeout(r, 1000)); // wait for debounce (120ms) + render
+    isExportingRef.current = true;
 
     const fixed = fixObjectFitForExport(panel);
     try {
       // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
 
-      // Hide the Leaflet radius circle — we'll draw it on canvas instead
-      // to avoid SVG transform offset issues after container resize
-      const radiusCircleSvg = panel.querySelector('.leaflet-overlay-pane svg');
-      const origSvgDisplay = radiusCircleSvg?.style.display;
-      if (radiusCircleSvg) radiusCircleSvg.style.display = 'none';
+      // Hide ALL SVG overlays (radius circle + connector lines) — we redraw
+      // both on canvas with correct coordinates. This prevents any Leaflet SVG
+      // polylines from leaking into the html2canvas capture.
+      const allSvgs = panel.querySelectorAll('svg');
+      const origSvgDisplays = [];
+      allSvgs.forEach((svg) => {
+        origSvgDisplays.push(svg.style.display);
+        svg.style.display = 'none';
+      });
 
       const rawCanvas = await html2canvas(panel, {
         width: CAPTURE_W,
@@ -1688,8 +1732,10 @@ export default function App() {
         backgroundColor: bgColor,
       });
 
-      // Restore SVG overlay after capture
-      if (radiusCircleSvg) radiusCircleSvg.style.display = origSvgDisplay || '';
+      // Restore all SVGs after capture
+      allSvgs.forEach((svg, i) => {
+        svg.style.display = origSvgDisplays[i] || '';
+      });
 
       // Build output canvas at 300 DPI landscape letter
       const outCanvas = document.createElement('canvas');
@@ -1725,58 +1771,95 @@ export default function App() {
         ctx.setLineDash([]);
         ctx.fillStyle = 'rgba(200, 169, 81, 0.04)';
         ctx.fill();
+
+        // Draw radius label at the bottom of the ring
+        const radiusLabel = parseFloat(radius) === 1 ? '1 Mile' : `${radius} Miles`;
+        const labelX = propPt.x * scaleX;
+        const labelY = (propPt.y + pxRadius) * scaleY + 18 * scaleY;
+        const labelFontSize = Math.round(13 * scaleX);
+        ctx.font = `600 ${labelFontSize}px "Gotham", "Montserrat", Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        // Background pill behind text
+        const metrics = ctx.measureText(radiusLabel);
+        const pillW = metrics.width + 16 * scaleX;
+        const pillH = labelFontSize + 10 * scaleX;
+        ctx.fillStyle = 'rgba(200, 169, 81, 0.85)';
+        const pillR = pillH / 2;
+        ctx.beginPath();
+        ctx.roundRect(labelX - pillW / 2, labelY - 3 * scaleX, pillW, pillH, pillR);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(radiusLabel, labelX, labelY);
       }
 
-      // Layer 2: Draw connector lines, then re-stamp marker regions on top
-      if (map && connectorDataRef.current.length > 0) {
+      // Layer 2: Draw connector lines from displaced logo markers to actual positions.
+      // Use connectorDataRef (lat/lng pairs from SmartClusterLayer) + latLngToContainerPoint
+      // for correct container-relative coordinates. Avoids DOM translate3d offset issues.
+      if (map && data && connectorDataRef.current && connectorDataRef.current.length > 0) {
         const scaleX = EXPORT_W / CAPTURE_W;
         const scaleY = EXPORT_H / CAPTURE_H;
         const rawScaleX = rawCanvas.width / CAPTURE_W;
         const rawScaleY = rawCanvas.height / CAPTURE_H;
-        const EXPORT_MARKER_PAD = 12; // Extra padding around marker box for re-stamping
 
-        // Pre-compute all connector screen coordinates
-        const connectorPts = connectorDataRef.current.map(({ from, to, iconW, iconH }) => {
-          const fromPt = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
-          const toPt = map.latLngToContainerPoint(L.latLng(to[0], to[1]));
-          return { fromPt, toPt, iconW, iconH };
-        });
+        const connectors = connectorDataRef.current.map((c) => {
+          const fromPt = map.latLngToContainerPoint(c.from);  // displaced marker position
+          const toPt = map.latLngToContainerPoint(c.to);      // actual retailer position
+          const iconW = c.iconW || 46;
+          const iconH = c.iconH || 46;
+          const dist = Math.hypot(fromPt.x - toPt.x, fromPt.y - toPt.y);
+          return {
+            fromX: fromPt.x,
+            fromY: fromPt.y + iconH / 2,  // bottom edge of logo
+            toX: toPt.x,
+            toY: toPt.y,
+            markerCx: fromPt.x,
+            markerCy: fromPt.y,
+            markerW: iconW,
+            markerH: iconH,
+            dist,
+          };
+        }).filter((c) => c.dist > 5 && c.dist <= 100);
 
-        // Pass 1: Draw white 4px connector lines + dot at actual location
-        connectorPts.forEach(({ fromPt, toPt, iconW, iconH }) => {
-          const dx = toPt.x - fromPt.x;
-          const dy = toPt.y - fromPt.y;
-          const halfW = iconW / 2;
-          const halfH = iconH / 2;
-          let t = 1;
-          if (dx !== 0) t = Math.min(t, halfW / Math.abs(dx));
-          if (dy !== 0) t = Math.min(t, halfH / Math.abs(dy));
-          const edgeX = (fromPt.x + dx * t) * scaleX;
-          const edgeY = (fromPt.y + dy * t) * scaleY;
-          const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
+        // Pass 1: Draw connector lines from bottom of logo to actual position
+        connectors.forEach(({ fromX, fromY, toX, toY }) => {
+          const x1 = fromX * scaleX, y1 = fromY * scaleY;
+          const x2 = toX * scaleX, y2 = toY * scaleY;
 
-          // White connector line
+          // Dark outline for visibility on satellite
           ctx.beginPath();
-          ctx.moveTo(edgeX, edgeY);
+          ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.lineWidth = 8 * scaleX;
+          ctx.stroke();
+          // White center
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 4 * scaleX;
           ctx.stroke();
 
-          // White dot at actual location
-          const dotR = 5 * scaleX;
+          // White dot with outline at actual location
           ctx.beginPath();
-          ctx.arc(x2, y2, dotR, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.arc(x2, y2, 7 * scaleX, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x2, y2, 5 * scaleX, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
           ctx.fill();
         });
 
-        // Pass 2: Re-stamp marker/cluster regions from original capture on top
-        connectorPts.forEach(({ fromPt, iconW, iconH }) => {
-          const boxX = fromPt.x - iconW / 2 - EXPORT_MARKER_PAD;
-          const boxY = fromPt.y - iconH / 2 - EXPORT_MARKER_PAD;
-          const boxW = iconW + EXPORT_MARKER_PAD * 2;
-          const boxH = iconH + EXPORT_MARKER_PAD * 2;
+        // Pass 2: Re-stamp marker regions from rawCanvas on top of connector lines
+        // so logos sit cleanly above the lines (connectors go under logos)
+        const STAMP_PAD = 6;
+        connectors.forEach(({ markerCx, markerCy, markerW, markerH }) => {
+          const boxX = markerCx - markerW / 2 - STAMP_PAD;
+          const boxY = markerCy - markerH / 2 - STAMP_PAD;
+          const boxW = markerW + STAMP_PAD * 2;
+          const boxH = markerH + STAMP_PAD * 2;
 
           const srcX = boxX * rawScaleX;
           const srcY = boxY * rawScaleY;

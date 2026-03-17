@@ -670,9 +670,9 @@ function getLocalLogoUrl(retailerName) {
   return file ? `/logos/${file}` : null;
 }
 
-const LOGO_H = 56; // Fixed height for all logo markers
-const LOGO_MIN_W = 56; // Minimum width (square)
-const LOGO_MAX_W = 130; // Maximum width (very wide logos)
+const LOGO_H = 46; // Fixed height for all logo markers
+const LOGO_MIN_W = 36; // Minimum width (narrow/square logos)
+const LOGO_MAX_W = 160; // Maximum width — auto-expand for wider logos
 
 // Cache of logo natural dimensions: url → { w, h, aspect }
 const logoDimCache = {};
@@ -730,21 +730,21 @@ function createLogoIcon(logoUrl, retailerName) {
 // Groups overlapping markers into clusters, then displaces clusters/singles
 // so the subject property is never blocked and the map stays clean.
 
-const MARKER_PAD = 8;
+const MARKER_PAD = 14;         // generous breathing room between individual logos
 const CLUSTER_CELL = 52;       // px per logo cell inside cluster grid
 const CLUSTER_GAP = 5;         // px gap between cells
 const CLUSTER_PAD = 8;         // px padding inside cluster border
 const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
 const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
-const MIN_CLUSTER_SIZE = 3;    // minimum items to form a cluster (pairs just push apart)
+const MIN_CLUSTER_SIZE = 999;  // disable clustering — all markers stay individual
 
 // Zoom-adaptive extra padding for merge detection:
 // At low zoom we pad more so distant markers merge sooner
 function getClusterPadding(zoom) {
-  if (zoom >= 16) return 4;   // tight: only merge if truly overlapping
-  if (zoom >= 14) return 10;
-  if (zoom >= 12) return 18;
-  return 28;                   // far out: merge aggressively
+  if (zoom >= 16) return 2;    // tight: only merge if truly overlapping
+  if (zoom >= 14) return 6;    // reduced from 10
+  if (zoom >= 12) return 12;   // reduced from 18
+  return 20;                    // reduced from 28
 }
 
 // SVG renderer for connecting lines (html2canvas captures SVG DOM elements reliably)
@@ -870,10 +870,12 @@ function createClusterGridIcon(cluster, childrenData) {
         : "this.style.display='none'";
       return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="44" height="44" style="object-fit:contain;" onerror="${cellErr}" /></div>`;
     }
-    // No logo — show initials with category color background
+    // No logo — show full brand name in a clean pill instead of 2-letter abbreviations
     const cfg = getCategoryConfig(child.category || 'Other');
-    const initials = (child.name || '?').substring(0, 2);
-    return `<div class="sc-cell sc-cell-text" style="background:${cfg.color}33;color:${cfg.color}">${initials}</div>`;
+    const brandName = (child.name || '?');
+    // Shorten to first word or max 10 chars for cluster cells
+    const shortName = brandName.split(/\s+/)[0].substring(0, 10);
+    return `<div class="sc-cell sc-cell-text" style="background:${cfg.color}22;color:${cfg.color};font-size:9px;font-weight:600;">${shortName}</div>`;
   }).join('');
 
   return L.divIcon({
@@ -897,16 +899,17 @@ function rectsOverlap(a, b) {
 function pushBothApart(a, b) {
   let dx = a.x - b.x;
   let dy = a.y - b.y;
-  const overlapX = (a.w + b.w) / 2 - Math.abs(dx);
-  const overlapY = (a.h + b.h) / 2 - Math.abs(dy);
+  const GAP = 12; // minimum pixel gap between markers
+  const overlapX = (a.w + b.w) / 2 + GAP - Math.abs(dx);
+  const overlapY = (a.h + b.h) / 2 + GAP - Math.abs(dy);
   if (overlapX <= 0 || overlapY <= 0) return false;
 
   if (overlapX < overlapY) {
-    const push = Math.sign(dx || 1) * (overlapX / 2 + 1);
+    const push = Math.sign(dx || 1) * (overlapX / 2 + 2);
     a.x += push;
     b.x -= push;
   } else {
-    const push = Math.sign(dy || 1) * (overlapY / 2 + 1);
+    const push = Math.sign(dy || 1) * (overlapY / 2 + 2);
     a.y += push;
     b.y -= push;
   }
@@ -937,15 +940,20 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
     idx: i,
   }));
 
+  const mapSize = map.getSize();
+  const margin = 80; // large margin to keep logos away from edges
+
   // Subject property rect (pinned, never moves)
-  // The icon anchor is at [70, 76] (bottom-center), so the marker extends
-  // 76px upward from the lat/lng point. Offset the rect center accordingly.
   const propPt = map.latLngToContainerPoint(propertyLatLng);
   const propW = 140 + MARKER_PAD * 2;
   const propH = 76 + MARKER_PAD * 2;
   const propRect = { x: propPt.x, y: propPt.y - propH / 2, w: propW, h: propH };
 
-  for (let iter = 0; iter < 60; iter++) {
+  // ── Phase 1: Logos start at actual positions ──
+  // No artificial spreading — collision resolution handles spacing.
+
+  // ── Phase 2: Iterative collision resolution ──
+  for (let iter = 0; iter < 200; iter++) {
     let moved = false;
 
     // Push away from subject property first (full clear, highest priority)
@@ -956,7 +964,7 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
       }
     }
 
-    // Push all markers/clusters apart from each other symmetrically
+    // Push all markers apart from each other symmetrically
     for (let i = 0; i < rects.length; i++) {
       for (let j = i + 1; j < rects.length; j++) {
         if (rectsOverlap(rects[i], rects[j])) {
@@ -969,13 +977,19 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
     if (!moved) break;
   }
 
+  // ── Phase 3: Boundary clamping ──
+  for (const r of rects) {
+    r.x = Math.max(margin + r.w / 2, Math.min(mapSize.x - margin - r.w / 2, r.x));
+    r.y = Math.max(margin + r.h / 2, Math.min(mapSize.y - margin - r.h / 2, r.y));
+  }
+
   return rects.map((r) => {
     const displacedLL = map.containerPointToLatLng([r.x, r.y]);
     const dist = Math.hypot(r.x - r.origX, r.y - r.origY);
     return {
       idx: r.idx,
       displacedLatLng: [displacedLL.lat, displacedLL.lng],
-      wasDisplaced: dist > 3,
+      wasDisplaced: dist > 1,
     };
   });
 }
@@ -1056,7 +1070,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const finalPt = map.latLngToContainerPoint(markerLatLng);
         const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
         const dist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
-        const isDisplaced = !!overridePos || dist > 5;
+        const isDisplaced = !!overridePos || dist > 1;
 
         if (cluster.type === 'single') {
           const item = cluster.items[0];
@@ -1119,27 +1133,25 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
             iconH: cluster.h,
           });
 
-          // Connector line — colony red, 4pt weight, rendered below markers
+          // Connector line — white 4px
           const line = L.polyline(
             [markerLatLng, cluster.centroidLatLng],
             {
               weight: 4,
-              color: '#c8102e',
-              opacity: 0.85,
+              color: '#ffffff',
+              opacity: 0.9,
               interactive: false,
               pane: 'connectorPane',
             }
           );
           lines.addLayer(line);
 
-          // Filled dot at the actual location
+          // White dot at the actual location
           const dot = L.circleMarker(cluster.centroidLatLng, {
             radius: 5,
-            fillColor: '#c8102e',
-            fillOpacity: 1,
-            stroke: true,
-            color: '#ffffff',
-            weight: 2.5,
+            fillColor: '#ffffff',
+            fillOpacity: 0.9,
+            stroke: false,
             interactive: false,
             pane: 'connectorPane',
           });
@@ -1297,8 +1309,12 @@ function exportCSV(property, retailers) {
 
 // ── Main App ─────────────────────────────────────────────────────
 export default function App() {
+  // Read URL params for automation (Puppeteer can pass ?style=satellite)
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const initialStyle = urlParams.get('style') || 'street';
+
   const [address, setAddress] = useState('');
-  const [radius, setRadius] = useState('3');
+  const [radius, setRadius] = useState('1');
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [error, setError] = useState('');
@@ -1311,7 +1327,7 @@ export default function App() {
   const [activeCategories, setActiveCategories] = useState(new Set());
   const [activeChainSizes, setActiveChainSizes] = useState(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mapStyle, setMapStyle] = useState('street'); // 'street' or 'satellite'
+  const [mapStyle, setMapStyle] = useState(initialStyle); // 'street' or 'satellite' (reads from ?style= URL param)
 
   const markerRefs = useRef({});
   const connectorDataRef = useRef([]);
@@ -1627,21 +1643,39 @@ export default function App() {
       map.setView(propLatLng, fitZoom, { animate: false });
     }
 
-    // Wait for tiles to load and layout to settle
-    await new Promise((r) => setTimeout(r, 1000));
+    // Wait for layout to settle, then force Leaflet to fully recalculate
+    await new Promise((r) => setTimeout(r, 500));
     if (map) {
       map.invalidateSize({ animate: false });
+
+      if (data) {
+        const propLatLng = [data.property.lat, data.property.lng];
+        const allPts = [propLatLng, ...data.retailers.map((r) => [r.lat, r.lng])];
+        map.fitBounds(allPts, { padding: [80, 80], maxZoom: 15, animate: false });
+        const fitZoom = map.getZoom();
+
+        // Force a complete pixel-origin reset so SVG overlays (radius ring)
+        // re-render at the correct position after container resize
+        map.setView(propLatLng, fitZoom, { animate: false });
+        map.invalidateSize({ animate: false });
+        // Nudge zoom to force Leaflet to recalculate all SVG transforms
+        map.setZoom(fitZoom - 0.01, { animate: false });
+        map.setView(propLatLng, fitZoom, { animate: false });
+      }
     }
-    // Extra settle for tile rendering
-    await new Promise((r) => setTimeout(r, 500));
+    // Wait for tiles + SVG to render at final position
+    await new Promise((r) => setTimeout(r, 2000));
 
     const fixed = fixObjectFitForExport(panel);
     try {
-      // ── Single capture + connector compositing ──
-      // Hide the connector SVG pane (we draw connectors manually on canvas)
+      // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
-      const connectorPane = map?.getPane('connectorPane');
-      if (connectorPane) connectorPane.style.display = 'none';
+
+      // Hide the Leaflet radius circle — we'll draw it on canvas instead
+      // to avoid SVG transform offset issues after container resize
+      const radiusCircleSvg = panel.querySelector('.leaflet-overlay-pane svg');
+      const origSvgDisplay = radiusCircleSvg?.style.display;
+      if (radiusCircleSvg) radiusCircleSvg.style.display = 'none';
 
       const rawCanvas = await html2canvas(panel, {
         width: CAPTURE_W,
@@ -1654,8 +1688,8 @@ export default function App() {
         backgroundColor: bgColor,
       });
 
-      // Restore connector pane
-      if (connectorPane) connectorPane.style.display = '';
+      // Restore SVG overlay after capture
+      if (radiusCircleSvg) radiusCircleSvg.style.display = origSvgDisplay || '';
 
       // Build output canvas at 300 DPI landscape letter
       const outCanvas = document.createElement('canvas');
@@ -1667,6 +1701,31 @@ export default function App() {
 
       // Layer 1: Full capture (tiles + markers)
       ctx.drawImage(rawCanvas, 0, 0, EXPORT_W, EXPORT_H);
+
+      // Layer 1.5: Draw radius ring directly on canvas (avoids SVG offset bug)
+      if (map && data) {
+        const scaleX = EXPORT_W / CAPTURE_W;
+        const scaleY = EXPORT_H / CAPTURE_H;
+        const lat = data.property.lat;
+        const lng = data.property.lng;
+        const propPt = map.latLngToContainerPoint([lat, lng]);
+        const radiusMeters = parseFloat(radius) * 1609.34;
+
+        // Calculate pixel radius: offset by radius in degrees latitude (~111,320 m/deg)
+        const degOffset = radiusMeters / 111320;
+        const northPt = map.latLngToContainerPoint([lat + degOffset, lng]);
+        const pxRadius = Math.abs(propPt.y - northPt.y);
+
+        ctx.beginPath();
+        ctx.arc(propPt.x * scaleX, propPt.y * scaleY, pxRadius * scaleX, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(200, 169, 81, 0.7)';
+        ctx.lineWidth = 4 * scaleX;
+        ctx.setLineDash([8 * scaleX, 6 * scaleX]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(200, 169, 81, 0.04)';
+        ctx.fill();
+      }
 
       // Layer 2: Draw connector lines, then re-stamp marker regions on top
       if (map && connectorDataRef.current.length > 0) {
@@ -1683,37 +1742,33 @@ export default function App() {
           return { fromPt, toPt, iconW, iconH };
         });
 
-        // Pass 1: Draw all connector lines (clipped to marker edge so tail attaches)
+        // Pass 1: Draw white 4px connector lines + dot at actual location
         connectorPts.forEach(({ fromPt, toPt, iconW, iconH }) => {
-          // Clip line start from marker center to marker box edge
           const dx = toPt.x - fromPt.x;
           const dy = toPt.y - fromPt.y;
           const halfW = iconW / 2;
           const halfH = iconH / 2;
-          // Find where the line from center to target exits the marker box
-          let t = 1; // parameter along line; 0 = center, 1 = target
+          let t = 1;
           if (dx !== 0) t = Math.min(t, halfW / Math.abs(dx));
           if (dy !== 0) t = Math.min(t, halfH / Math.abs(dy));
           const edgeX = (fromPt.x + dx * t) * scaleX;
           const edgeY = (fromPt.y + dy * t) * scaleY;
           const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
 
+          // White connector line
           ctx.beginPath();
           ctx.moveTo(edgeX, edgeY);
           ctx.lineTo(x2, y2);
-          ctx.strokeStyle = 'rgba(200, 16, 46, 0.85)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
           ctx.lineWidth = 4 * scaleX;
           ctx.stroke();
 
-          // Filled dot at the actual location
+          // White dot at actual location
           const dotR = 5 * scaleX;
           ctx.beginPath();
           ctx.arc(x2, y2, dotR, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(200, 16, 46, 1)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
           ctx.fill();
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2.5 * scaleX;
-          ctx.stroke();
         });
 
         // Pass 2: Re-stamp marker/cluster regions from original capture on top

@@ -1645,23 +1645,32 @@ export default function App() {
       map.invalidateSize({ animate: false });
     }
 
-    // Center on subject property and zoom to fit all retailers
+    // Center on subject property with the radius ring fully visible + clean margins.
+    // Strategy: fit to ring bounds first (guarantees ring visibility), then zoom out
+    // further only if retailers fall outside. Always re-center on property.
     if (map && data) {
       const propLatLng = [data.property.lat, data.property.lng];
-      const allPts = [
-        propLatLng,
-        ...data.retailers.map((r) => [r.lat, r.lng]),
-      ];
-      // Fit bounds to determine the right zoom level
-      map.fitBounds(allPts, {
-        padding: [60, 60],
-        maxZoom: 15,
-        animate: false,
-      });
+      const radiusMeters = parseFloat(radius) * 1609.34;
+      const degLat = radiusMeters / 111320;
+      const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
+      const RING_PADDING = 160; // px margin around ring on all sides
 
-      // Re-center on subject property so the radius circle is centered in export
-      const fitZoom = map.getZoom();
-      map.setView(propLatLng, fitZoom, { animate: false });
+      // Step 1: Fit to ring bounds — this zoom guarantees the full ring is visible
+      const ringBounds = [
+        [data.property.lat - degLat, data.property.lng - degLng],
+        [data.property.lat + degLat, data.property.lng + degLng],
+      ];
+      map.fitBounds(ringBounds, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
+      const ringZoom = map.getZoom();
+
+      // Step 2: Fit to all points (ring + retailers) — may zoom out further for outliers
+      const allPts = [propLatLng, ...ringBounds, ...data.retailers.map((r) => [r.lat, r.lng])];
+      map.fitBounds(allPts, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
+      const allZoom = map.getZoom();
+
+      // Use whichever zoom is more zoomed out (smaller number)
+      const finalZoom = Math.min(ringZoom, allZoom);
+      map.setView(propLatLng, finalZoom, { animate: false });
     }
 
     // Wait for layout to settle, then force Leaflet to fully recalculate
@@ -1671,25 +1680,33 @@ export default function App() {
 
       if (data) {
         const propLatLng = [data.property.lat, data.property.lng];
-        // Include the full radius ring in bounds so it never gets cut off
         const radiusMeters = parseFloat(radius) * 1609.34;
         const degLat = radiusMeters / 111320;
         const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
+        const RING_PADDING = 160;
+
+        // Fit to ring bounds first — guarantees ring fully visible
         const ringBounds = [
           [data.property.lat - degLat, data.property.lng - degLng],
           [data.property.lat + degLat, data.property.lng + degLng],
         ];
-        const allPts = [propLatLng, ...ringBounds, ...data.retailers.map((r) => [r.lat, r.lng])];
-        map.fitBounds(allPts, { padding: [100, 100], maxZoom: 15, animate: false });
-        const fitZoom = map.getZoom();
+        map.fitBounds(ringBounds, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
+        const ringZoom = map.getZoom();
 
-        // Force a complete pixel-origin reset so SVG overlays (radius ring)
+        // Also fit to all retailers — may zoom out further for outliers
+        const allPts = [propLatLng, ...ringBounds, ...data.retailers.map((r) => [r.lat, r.lng])];
+        map.fitBounds(allPts, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
+        const allZoom = map.getZoom();
+
+        const finalZoom = Math.min(ringZoom, allZoom);
+
+        // Force a complete pixel-origin reset so SVG overlays
         // re-render at the correct position after container resize
-        map.setView(propLatLng, fitZoom, { animate: false });
+        map.setView(propLatLng, finalZoom, { animate: false });
         map.invalidateSize({ animate: false });
         // Nudge zoom to force Leaflet to recalculate all SVG transforms
-        map.setZoom(fitZoom - 0.01, { animate: false });
-        map.setView(propLatLng, fitZoom, { animate: false });
+        map.setZoom(finalZoom - 0.01, { animate: false });
+        map.setView(propLatLng, finalZoom, { animate: false });
       }
     }
     // Wait for tiles to render at final position

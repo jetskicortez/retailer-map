@@ -1123,9 +1123,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         }
 
         // Draw connector line from marker to actual map location
-        // Only draw if displacement is short enough to look intentional (not a stray line)
-        const MAX_CONNECTOR_PX = 100;
-        if (isDisplaced && dist <= MAX_CONNECTOR_PX) {
+        if (isDisplaced) {
           // Store data for canvas-based export drawing
           // iconW/iconH = visible logo size (without MARKER_PAD collision buffer)
           // padW/padH = full bounding box including MARKER_PAD (for re-stamping)
@@ -1667,8 +1665,9 @@ export default function App() {
       map.fitBounds(ringBounds, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
       const ringZoom = map.getZoom();
 
-      // Step 2: Fit to all points (ring + retailers) — may zoom out further for outliers
-      const allPts = [propLatLng, ...ringBounds, ...data.retailers.map((r) => [r.lat, r.lng])];
+      // Step 2: Fit to all VISIBLE points (ring + filtered retailers) — may zoom out further for outliers
+      const visibleRetailers = filteredRetailers.length > 0 ? filteredRetailers : data.retailers;
+      const allPts = [propLatLng, ...ringBounds, ...visibleRetailers.map((r) => [r.lat, r.lng])];
       map.fitBounds(allPts, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
       const allZoom = map.getZoom();
 
@@ -1697,8 +1696,9 @@ export default function App() {
         map.fitBounds(ringBounds, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
         const ringZoom = map.getZoom();
 
-        // Also fit to all retailers — may zoom out further for outliers
-        const allPts = [propLatLng, ...ringBounds, ...data.retailers.map((r) => [r.lat, r.lng])];
+        // Also fit to all VISIBLE retailers — may zoom out further for outliers
+        const visibleRetailers = filteredRetailers.length > 0 ? filteredRetailers : data.retailers;
+        const allPts = [propLatLng, ...ringBounds, ...visibleRetailers.map((r) => [r.lat, r.lng])];
         map.fitBounds(allPts, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
         const allZoom = map.getZoom();
 
@@ -1842,7 +1842,7 @@ export default function App() {
             markerH: padH,
             dist,
           };
-        }).filter((c) => c.dist > 5 && c.dist <= 100);
+        }).filter((c) => c.dist > 5);
 
         // Pass 1: Draw connector lines from bottom of logo to actual position
         connectors.forEach(({ fromX, fromY, toX, toY }) => {
@@ -1919,7 +1919,7 @@ export default function App() {
         }
       }
     }
-  }, [data, mapStyle]);
+  }, [data, mapStyle, filteredRetailers]);
 
   // Export map as high-res PNG (8.5×11 landscape)
   const handleExportImage = useCallback(async () => {

@@ -954,85 +954,100 @@ function pushAwayFrom(mover, anchor) {
 }
 
 function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles) {
-  const rects = clusters.map((c, i) => ({
-    x: c.cx, y: c.cy,
-    w: c.w, h: c.h,
-    origX: c.cx, origY: c.cy,
-    idx: i,
-  }));
-
   const mapSize = map.getSize();
-  const margin = 80; // large margin to keep logos away from edges
-
-  // Subject property rect (pinned, never moves)
-  // The property icon anchor is at bottom of pin, icon extends 76px above.
-  // Center the exclusion rect on the visual center of the property marker.
   const propPt = map.latLngToContainerPoint(propertyLatLng);
-  const propW = 160 + MARKER_PAD * 2;
-  const propH = 76 + MARKER_PAD * 2;
-  const propRect = { x: propPt.x, y: propPt.y - 76 / 2, w: propW, h: propH };
+  const MARGIN_X = 20;  // px from left/right edge
+  const MARGIN_Y = 30;  // px from top/bottom edge
+  const GAP_Y = 10;     // vertical gap between logos in a column
 
-  // "1 Mile" label exclusion zone — sits at bottom of radius ring
-  let labelRect = null;
-  if (radiusMiles && propertyLatLng) {
-    const radiusMeters = radiusMiles * 1609.34;
-    const degLat = radiusMeters / 111320;
-    const labelLatLng = L.latLng(
-      propertyLatLng.lat - degLat,
-      propertyLatLng.lng
-    );
-    const labelPt = map.latLngToContainerPoint(labelLatLng);
-    labelRect = { x: labelPt.x, y: labelPt.y, w: 100, h: 40 };
+  // Compute radius ring position in pixels for column placement
+  const radiusMeters = (radiusMiles || 1) * 1609.34;
+  const degLat = radiusMeters / 111320;
+  const degLng = radiusMeters / (111320 * Math.cos(propertyLatLng.lat * Math.PI / 180));
+  const ringLeftPt = map.latLngToContainerPoint([propertyLatLng.lat, propertyLatLng.lng - degLng]);
+  const ringRightPt = map.latLngToContainerPoint([propertyLatLng.lat, propertyLatLng.lng + degLng]);
+  const ringLeft = ringLeftPt.x;
+  const ringRight = ringRightPt.x;
+
+  // Split clusters into left/right based on actual position relative to property
+  const leftItems = [];
+  const rightItems = [];
+  clusters.forEach((c, i) => {
+    if (c.cx <= propPt.x) {
+      leftItems.push({ ...c, idx: i });
+    } else {
+      rightItems.push({ ...c, idx: i });
+    }
+  });
+
+  // Balance: if one side has way more, move some to the other
+  while (leftItems.length > rightItems.length + 2) {
+    rightItems.push(leftItems.pop());
+  }
+  while (rightItems.length > leftItems.length + 2) {
+    leftItems.push(rightItems.pop());
   }
 
-  // ── Phase 1: Logos start at actual positions ──
-  // No artificial spreading — collision resolution handles spacing.
+  // Sort each column by original latitude (top to bottom on map)
+  leftItems.sort((a, b) => a.cy - b.cy);
+  rightItems.sort((a, b) => a.cy - b.cy);
 
-  // ── Phase 2: Iterative collision resolution ──
-  for (let iter = 0; iter < 200; iter++) {
-    let moved = false;
+  // Compute column positions
+  // Left column: right-aligned to just outside the ring (or at left margin if ring is far right)
+  // Right column: left-aligned to just outside the ring
+  const RING_GAP = 30; // gap between ring edge and logo column
+  const leftColRight = Math.min(ringLeft - RING_GAP, mapSize.x * 0.4);
+  const rightColLeft = Math.max(ringRight + RING_GAP, mapSize.x * 0.6);
 
-    // Push away from subject property first (full clear, highest priority)
-    for (const r of rects) {
-      if (rectsOverlap(r, propRect)) {
-        pushAwayFrom(r, propRect);
-        moved = true;
-      }
-      // Push away from "1 Mile" label at bottom of radius ring
-      if (labelRect && rectsOverlap(r, labelRect)) {
-        pushAwayFrom(r, labelRect);
-        moved = true;
-      }
+  // Layout function: evenly distribute items vertically, aligned to column edge
+  function layoutColumn(items, colEdgeX, alignRight) {
+    if (items.length === 0) return [];
+    const totalH = items.reduce((sum, c) => sum + c.h, 0) + (items.length - 1) * GAP_Y;
+    // Center the column vertically in the usable area
+    const usableTop = MARGIN_Y;
+    const usableBottom = mapSize.y - MARGIN_Y;
+    const usableH = usableBottom - usableTop;
+    let startY = usableTop + Math.max(0, (usableH - totalH) / 2);
+
+    // If items don't fit, compress the gap
+    let effectiveGap = GAP_Y;
+    if (totalH > usableH) {
+      const totalItemH = items.reduce((sum, c) => sum + c.h, 0);
+      effectiveGap = Math.max(2, (usableH - totalItemH) / Math.max(1, items.length - 1));
+      startY = usableTop;
     }
 
-    // Push all markers apart from each other symmetrically
-    for (let i = 0; i < rects.length; i++) {
-      for (let j = i + 1; j < rects.length; j++) {
-        if (rectsOverlap(rects[i], rects[j])) {
-          pushBothApart(rects[i], rects[j]);
-          moved = true;
-        }
-      }
+    return items.map((c) => {
+      const y = startY + c.h / 2;
+      // Align: right-align for left column, left-align for right column
+      const x = alignRight
+        ? Math.max(MARGIN_X + c.w / 2, colEdgeX - c.w / 2)
+        : Math.min(mapSize.x - MARGIN_X - c.w / 2, colEdgeX + c.w / 2);
+      startY += c.h + effectiveGap;
+      return { idx: c.idx, x, y, origX: c.cx, origY: c.cy };
+    });
+  }
+
+  const leftPositions = layoutColumn(leftItems, leftColRight, true);
+  const rightPositions = layoutColumn(rightItems, rightColLeft, false);
+  const allPositions = [...leftPositions, ...rightPositions];
+
+  // Build result indexed by cluster idx
+  const result = clusters.map((c, i) => {
+    const pos = allPositions.find((p) => p.idx === i);
+    if (!pos) {
+      return { idx: i, displacedLatLng: [propertyLatLng.lat, propertyLatLng.lng], wasDisplaced: false };
     }
-
-    if (!moved) break;
-  }
-
-  // ── Phase 3: Boundary clamping ──
-  for (const r of rects) {
-    r.x = Math.max(margin + r.w / 2, Math.min(mapSize.x - margin - r.w / 2, r.x));
-    r.y = Math.max(margin + r.h / 2, Math.min(mapSize.y - margin - r.h / 2, r.y));
-  }
-
-  return rects.map((r) => {
-    const displacedLL = map.containerPointToLatLng([r.x, r.y]);
-    const dist = Math.hypot(r.x - r.origX, r.y - r.origY);
+    const displacedLL = map.containerPointToLatLng([pos.x, pos.y]);
+    const dist = Math.hypot(pos.x - pos.origX, pos.y - pos.origY);
     return {
-      idx: r.idx,
+      idx: i,
       displacedLatLng: [displacedLL.lat, displacedLL.lng],
       wasDisplaced: dist > 1,
     };
   });
+
+  return result;
 }
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
@@ -1097,125 +1112,6 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
       // Step 2: Displace clusters to avoid subject property + each other
       const displaced = displaceClusterRects(map, clusters, propLL, radiusMiles);
-
-      // Step 2b: Post-override collision resolution
-      // Apply drag overrides, then push non-dragged markers away from dragged ones
-      const finalPositions = clusters.map((cluster, ci) => {
-        const dp = displaced[ci];
-        if (!dp) return null;
-        const clusterKey = getClusterKey(cluster);
-        const overridePos = dragOverrides.current[clusterKey];
-        const pos = overridePos || dp.displacedLatLng;
-        const pt = map.latLngToContainerPoint(pos);
-        return {
-          x: pt.x, y: pt.y,
-          w: cluster.w, h: cluster.h,
-          pinned: !!overridePos, // user-dragged markers don't move
-          ci,
-        };
-      }).filter(Boolean);
-
-      // Iterative push: pinned markers stay, others get nudged
-      const propPt = map.latLngToContainerPoint(propLL);
-      const propRect = { x: propPt.x, y: propPt.y - 76 / 2, w: 160 + MARKER_PAD * 2, h: 76 + MARKER_PAD * 2 };
-      for (let iter = 0; iter < 150; iter++) {
-        let moved = false;
-        for (const fp of finalPositions) {
-          if (fp.pinned) continue;
-          // Push away from subject property
-          if (rectsOverlap(fp, propRect)) {
-            pushAwayFrom(fp, propRect);
-            moved = true;
-          }
-        }
-        for (let i = 0; i < finalPositions.length; i++) {
-          for (let j = i + 1; j < finalPositions.length; j++) {
-            const a = finalPositions[i], b = finalPositions[j];
-            if (!rectsOverlap(a, b)) continue;
-            if (a.pinned && b.pinned) continue; // both dragged — don't move either
-            if (a.pinned) { pushAwayFrom(b, a); moved = true; }
-            else if (b.pinned) { pushAwayFrom(a, b); moved = true; }
-            else { pushBothApart(a, b); moved = true; }
-          }
-        }
-        if (!moved) break;
-      }
-
-      // Step 2c: Connector-line-aware collision resolution
-      // Check if any logo's bounding box crosses another logo's connector line.
-      // If so, push the obstructing logo away from the line.
-      // Limit total drift from pre-connector position to prevent cascade effects.
-      const LINE_CLEAR = 8; // px clearance around connector lines
-      const MAX_CONNECTOR_DRIFT = 50; // max px a logo can drift from its step-2b position
-      // Snapshot pre-connector positions for drift limiting
-      const preConnectorPos = finalPositions.map((fp) => ({ x: fp.x, y: fp.y }));
-
-      for (let iter = 0; iter < 15; iter++) {
-        let moved = false;
-        for (let i = 0; i < finalPositions.length; i++) {
-          const fp = finalPositions[i];
-          const cluster = clusters[fp.ci];
-          const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
-          const connDist = Math.hypot(fp.x - origPt.x, fp.y - origPt.y);
-          if (connDist < 5) continue; // no visible connector for this logo
-
-          // Only check SHORT connectors (long ones are less likely to cause issues
-          // and checking them causes cascade displacement)
-          if (connDist > 120) continue;
-
-          for (let j = 0; j < finalPositions.length; j++) {
-            if (i === j) continue;
-            const other = finalPositions[j];
-            if (other.pinned) continue;
-
-            // Check if this logo already drifted too far
-            const drift = Math.hypot(other.x - preConnectorPos[j].x, other.y - preConnectorPos[j].y);
-            if (drift >= MAX_CONNECTOR_DRIFT) continue;
-
-            const rectL = other.x - other.w / 2 - LINE_CLEAR;
-            const rectR = other.x + other.w / 2 + LINE_CLEAR;
-            const rectT = other.y - other.h / 2 - LINE_CLEAR;
-            const rectB = other.y + other.h / 2 + LINE_CLEAR;
-
-            const lx1 = fp.x, ly1 = fp.y, lx2 = origPt.x, ly2 = origPt.y;
-            if (lineIntersectsRect(lx1, ly1, lx2, ly2, rectL, rectT, rectR, rectB)) {
-              const lineDx = lx2 - lx1;
-              const lineDy = ly2 - ly1;
-              const lineLen = Math.hypot(lineDx, lineDy) || 1;
-              let perpX = -lineDy / lineLen;
-              let perpY = lineDx / lineLen;
-              // Choose the side the logo is already on
-              const dx = other.x - (lx1 + lx2) / 2;
-              const dy = other.y - (ly1 + ly2) / 2;
-              if (perpX * dx + perpY * dy < 0) { perpX = -perpX; perpY = -perpY; }
-              other.x += perpX * 6;
-              other.y += perpY * 6;
-              moved = true;
-            }
-          }
-        }
-        if (!moved) break;
-      }
-
-      // Final enforcement: ensure nothing overlaps the property marker
-      for (let iter = 0; iter < 20; iter++) {
-        let moved = false;
-        for (const fp of finalPositions) {
-          if (fp.pinned) continue;
-          if (rectsOverlap(fp, propRect)) {
-            pushAwayFrom(fp, propRect);
-            moved = true;
-          }
-        }
-        if (!moved) break;
-      }
-
-      // Write resolved positions back (only for non-pinned markers)
-      finalPositions.forEach((fp) => {
-        if (fp.pinned) return;
-        const resolvedLL = map.containerPointToLatLng([fp.x, fp.y]);
-        displaced[fp.ci].displacedLatLng = [resolvedLL.lat, resolvedLL.lng];
-      });
 
       // Step 3: Render each cluster or single marker
       clusters.forEach((cluster, ci) => {
@@ -1282,12 +1178,8 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           layers.addLayer(marker);
         }
 
-        // Draw connector line from marker to actual map location
-        // For auto-displaced logos, cap connector length to keep map clean.
-        // User-dragged logos have unlimited connector length.
-        const AUTO_CONNECTOR_MAX = 120; // px max for algorithmically-displaced connectors
-        const showConnector = isDisplaced && (!!overridePos || dist <= AUTO_CONNECTOR_MAX);
-        if (showConnector) {
+        // Draw connector line from logo to actual map location
+        if (isDisplaced) {
           // Store data for canvas-based export drawing
           // iconW/iconH = visible logo size (without MARKER_PAD collision buffer)
           // padW/padH = full bounding box including MARKER_PAD (for re-stamping)

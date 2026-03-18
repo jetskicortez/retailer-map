@@ -1210,13 +1210,20 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       debouncedRender();
     };
 
+    // Export-safe re-render: recalculates positions preserving drag overrides
+    const onExportRender = () => {
+      render();
+    };
+
     map.on('zoomend', onZoom);
     map.on('moveend', debouncedRender);
+    map.on('exportrender', onExportRender);
 
     return () => {
       if (timer) clearTimeout(timer);
       map.off('zoomend', onZoom);
       map.off('moveend', debouncedRender);
+      map.off('exportrender', onExportRender);
     };
   }, [children, onMarkerClick, markerRefs, propertyLatLng, map]);
 
@@ -1717,15 +1724,13 @@ export default function App() {
     await new Promise((r) => setTimeout(r, 2000));
 
     // Force SmartClusterLayer to re-render at the export-sized map dimensions
-    // so connector positions are recalculated correctly for the new viewport
-    isExportingRef.current = false;
+    // so connector positions are recalculated correctly for the new viewport.
+    // Uses custom 'exportrender' event to preserve user's manual drag overrides
+    // (unlike zoomend which would clear them).
     if (map) {
-      // Clear drag overrides so displacement is recalculated fresh
-      map.fire('zoomend');  // clears dragOverrides + triggers re-render
-      map.fire('moveend');  // triggers debouncedRender
+      map.fire('exportrender');
     }
-    await new Promise((r) => setTimeout(r, 1000)); // wait for debounce (120ms) + render
-    isExportingRef.current = true;
+    await new Promise((r) => setTimeout(r, 500)); // wait for render to complete
 
     const fixed = fixObjectFitForExport(panel);
     try {
@@ -1876,15 +1881,14 @@ export default function App() {
         });
 
         // Pass 2: Re-stamp marker regions from rawCanvas on top of connector lines
-        // so logos sit cleanly above the lines. Leave bottom 4px exposed so the
-        // connector attachment point at the logo base remains visible.
-        const STAMP_PAD = 4;
-        const BOTTOM_EXPOSE = 4; // px to leave uncovered at bottom for connector attachment
+        // so logos sit cleanly above the lines. Inset by EDGE_INSET on all 4 sides
+        // so connector attachment points are never covered regardless of direction.
+        const EDGE_INSET = 3; // px inset from each edge — connectors visible at all edges
         connectors.forEach(({ markerCx, markerCy, markerW, markerH }) => {
-          const boxX = markerCx - markerW / 2 - STAMP_PAD;
-          const boxY = markerCy - markerH / 2 - STAMP_PAD;
-          const boxW = markerW + STAMP_PAD * 2;
-          const boxH = markerH + STAMP_PAD * 2 - BOTTOM_EXPOSE;
+          const boxX = markerCx - markerW / 2 + EDGE_INSET;
+          const boxY = markerCy - markerH / 2 + EDGE_INSET;
+          const boxW = markerW - EDGE_INSET * 2;
+          const boxH = markerH - EDGE_INSET * 2;
 
           const srcX = boxX * rawScaleX;
           const srcY = boxY * rawScaleY;

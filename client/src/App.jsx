@@ -920,7 +920,7 @@ function lineIntersectsRect(x1, y1, x2, y2, left, top, right, bottom) {
 function pushBothApart(a, b) {
   let dx = a.x - b.x;
   let dy = a.y - b.y;
-  const GAP = 30; // generous gap so connector lines between logos stay visible
+  const GAP = 36; // generous gap so connector lines between logos stay visible
   const overlapX = (a.w + b.w) / 2 + GAP - Math.abs(dx);
   const overlapY = (a.h + b.h) / 2 + GAP - Math.abs(dy);
   if (overlapX <= 0 || overlapY <= 0) return false;
@@ -1100,7 +1100,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       // Iterative push: pinned markers stay, others get nudged
       const propPt = map.latLngToContainerPoint(propLL);
       const propRect = { x: propPt.x, y: propPt.y - 76 / 2, w: 160 + MARKER_PAD * 2, h: 76 + MARKER_PAD * 2 };
-      for (let iter = 0; iter < 80; iter++) {
+      for (let iter = 0; iter < 150; iter++) {
         let moved = false;
         for (const fp of finalPositions) {
           if (fp.pinned) continue;
@@ -1883,16 +1883,16 @@ export default function App() {
       // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
 
-      // Hide Leaflet overlay SVGs (radius circle + connector lines) — we redraw
-      // both on canvas with correct coordinates. This prevents any Leaflet SVG
-      // polylines from leaking into the html2canvas capture.
-      // IMPORTANT: Only hide SVGs inside overlay/connector panes, NOT marker SVGs
-      // (like the property pin icon which must remain visible in the capture).
-      const overlaySvgs = panel.querySelectorAll(
-        '.leaflet-overlay-pane svg, .leaflet-connectorPane-pane svg'
+      // Hide ALL SVGs except those inside marker icons (property pin, etc.)
+      // We redraw radius ring + connectors on canvas with correct coordinates.
+      // Leaflet renders ALL polylines in a single SVG regardless of pane, so we
+      // must hide every SVG. Marker SVGs (inside .leaflet-marker-icon) are excluded.
+      const allSvgs = [...panel.querySelectorAll('svg')];
+      const svgsToHide = allSvgs.filter((svg) =>
+        !svg.closest('.leaflet-marker-icon') && !svg.closest('.property-marker')
       );
       const origSvgDisplays = [];
-      overlaySvgs.forEach((svg) => {
+      svgsToHide.forEach((svg) => {
         origSvgDisplays.push(svg.style.display);
         svg.style.display = 'none';
       });
@@ -1908,8 +1908,8 @@ export default function App() {
         backgroundColor: bgColor,
       });
 
-      // Restore overlay SVGs after capture
-      overlaySvgs.forEach((svg, i) => {
+      // Restore SVGs after capture
+      svgsToHide.forEach((svg, i) => {
         svg.style.display = origSvgDisplays[i] || '';
       });
 

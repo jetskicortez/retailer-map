@@ -965,10 +965,12 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
   const margin = 80; // large margin to keep logos away from edges
 
   // Subject property rect (pinned, never moves)
+  // The property icon anchor is at bottom of pin, icon extends 76px above.
+  // Center the exclusion rect on the visual center of the property marker.
   const propPt = map.latLngToContainerPoint(propertyLatLng);
-  const propW = 140 + MARKER_PAD * 2;
+  const propW = 160 + MARKER_PAD * 2;
   const propH = 76 + MARKER_PAD * 2;
-  const propRect = { x: propPt.x, y: propPt.y - propH / 2, w: propW, h: propH };
+  const propRect = { x: propPt.x, y: propPt.y - 76 / 2, w: propW, h: propH };
 
   // ── Phase 1: Logos start at actual positions ──
   // No artificial spreading — collision resolution handles spacing.
@@ -1097,7 +1099,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
 
       // Iterative push: pinned markers stay, others get nudged
       const propPt = map.latLngToContainerPoint(propLL);
-      const propRect = { x: propPt.x, y: propPt.y - (76 + MARKER_PAD * 2) / 2, w: 140 + MARKER_PAD * 2, h: 76 + MARKER_PAD * 2 };
+      const propRect = { x: propPt.x, y: propPt.y - 76 / 2, w: 160 + MARKER_PAD * 2, h: 76 + MARKER_PAD * 2 };
       for (let iter = 0; iter < 80; iter++) {
         let moved = false;
         for (const fp of finalPositions) {
@@ -1124,51 +1126,67 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       // Step 2c: Connector-line-aware collision resolution
       // Check if any logo's bounding box crosses another logo's connector line.
       // If so, push the obstructing logo away from the line.
-      // Connector = line from displaced position (logo center) to actual position (centroid).
-      const LINE_CLEAR = 10; // px clearance around connector lines
-      for (let iter = 0; iter < 40; iter++) {
+      // Limit total drift from pre-connector position to prevent cascade effects.
+      const LINE_CLEAR = 8; // px clearance around connector lines
+      const MAX_CONNECTOR_DRIFT = 50; // max px a logo can drift from its step-2b position
+      // Snapshot pre-connector positions for drift limiting
+      const preConnectorPos = finalPositions.map((fp) => ({ x: fp.x, y: fp.y }));
+
+      for (let iter = 0; iter < 15; iter++) {
         let moved = false;
         for (let i = 0; i < finalPositions.length; i++) {
           const fp = finalPositions[i];
           const cluster = clusters[fp.ci];
           const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
-          const dist = Math.hypot(fp.x - origPt.x, fp.y - origPt.y);
-          if (dist < 5) continue; // no connector for this logo
+          const connDist = Math.hypot(fp.x - origPt.x, fp.y - origPt.y);
+          if (connDist < 5) continue; // no visible connector for this logo
 
-          // Check if any OTHER logo's rect intersects this connector line
+          // Only check SHORT connectors (long ones are less likely to cause issues
+          // and checking them causes cascade displacement)
+          if (connDist > 120) continue;
+
           for (let j = 0; j < finalPositions.length; j++) {
             if (i === j) continue;
             const other = finalPositions[j];
-            if (other.pinned) continue; // don't move user-placed logos
+            if (other.pinned) continue;
 
-            // Test if rect `other` intersects line segment from fp → origPt
+            // Check if this logo already drifted too far
+            const drift = Math.hypot(other.x - preConnectorPos[j].x, other.y - preConnectorPos[j].y);
+            if (drift >= MAX_CONNECTOR_DRIFT) continue;
+
             const rectL = other.x - other.w / 2 - LINE_CLEAR;
             const rectR = other.x + other.w / 2 + LINE_CLEAR;
             const rectT = other.y - other.h / 2 - LINE_CLEAR;
             const rectB = other.y + other.h / 2 + LINE_CLEAR;
 
-            // Simple: check if line segment passes through expanded rect
-            // Use parametric line clipping (Cohen-Sutherland style)
             const lx1 = fp.x, ly1 = fp.y, lx2 = origPt.x, ly2 = origPt.y;
             if (lineIntersectsRect(lx1, ly1, lx2, ly2, rectL, rectT, rectR, rectB)) {
-              // Push other away from the midpoint of the line segment
-              const midX = (lx1 + lx2) / 2;
-              const midY = (ly1 + ly2) / 2;
-              let dx = other.x - midX;
-              let dy = other.y - midY;
-              const len = Math.hypot(dx, dy) || 1;
-              // Push perpendicular to the line direction for cleaner separation
               const lineDx = lx2 - lx1;
               const lineDy = ly2 - ly1;
               const lineLen = Math.hypot(lineDx, lineDy) || 1;
-              // Perpendicular direction (choose side the logo is already on)
               let perpX = -lineDy / lineLen;
               let perpY = lineDx / lineLen;
+              // Choose the side the logo is already on
+              const dx = other.x - (lx1 + lx2) / 2;
+              const dy = other.y - (ly1 + ly2) / 2;
               if (perpX * dx + perpY * dy < 0) { perpX = -perpX; perpY = -perpY; }
-              other.x += perpX * 8;
-              other.y += perpY * 8;
+              other.x += perpX * 6;
+              other.y += perpY * 6;
               moved = true;
             }
+          }
+        }
+        if (!moved) break;
+      }
+
+      // Final enforcement: ensure nothing overlaps the property marker
+      for (let iter = 0; iter < 20; iter++) {
+        let moved = false;
+        for (const fp of finalPositions) {
+          if (fp.pinned) continue;
+          if (rectsOverlap(fp, propRect)) {
+            pushAwayFrom(fp, propRect);
+            moved = true;
           }
         }
         if (!moved) break;
@@ -1247,7 +1265,11 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         }
 
         // Draw connector line from marker to actual map location
-        if (isDisplaced) {
+        // For auto-displaced logos, cap connector length to keep map clean.
+        // User-dragged logos have unlimited connector length.
+        const AUTO_CONNECTOR_MAX = 120; // px max for algorithmically-displaced connectors
+        const showConnector = isDisplaced && (!!overridePos || dist <= AUTO_CONNECTOR_MAX);
+        if (showConnector) {
           // Store data for canvas-based export drawing
           // iconW/iconH = visible logo size (without MARKER_PAD collision buffer)
           // padW/padH = full bounding box including MARKER_PAD (for re-stamping)
@@ -1786,7 +1808,7 @@ export default function App() {
       const radiusMeters = parseFloat(radius) * 1609.34;
       const degLat = radiusMeters / 111320;
       const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
-      const RING_PADDING = 50; // px margin around ring on all sides
+      const RING_PADDING = 42; // px margin around ring on all sides
 
       // Step 1: Fit to ring bounds — this zoom guarantees the full ring is visible
       const ringBounds = [
@@ -1817,7 +1839,7 @@ export default function App() {
         const radiusMeters = parseFloat(radius) * 1609.34;
         const degLat = radiusMeters / 111320;
         const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
-        const RING_PADDING = 50;
+        const RING_PADDING = 42;
 
         // Fit to ring bounds first — guarantees ring fully visible
         const ringBounds = [
@@ -1861,12 +1883,16 @@ export default function App() {
       // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
 
-      // Hide ALL SVG overlays (radius circle + connector lines) — we redraw
+      // Hide Leaflet overlay SVGs (radius circle + connector lines) — we redraw
       // both on canvas with correct coordinates. This prevents any Leaflet SVG
       // polylines from leaking into the html2canvas capture.
-      const allSvgs = panel.querySelectorAll('svg');
+      // IMPORTANT: Only hide SVGs inside overlay/connector panes, NOT marker SVGs
+      // (like the property pin icon which must remain visible in the capture).
+      const overlaySvgs = panel.querySelectorAll(
+        '.leaflet-overlay-pane svg, .leaflet-connectorPane-pane svg'
+      );
       const origSvgDisplays = [];
-      allSvgs.forEach((svg) => {
+      overlaySvgs.forEach((svg) => {
         origSvgDisplays.push(svg.style.display);
         svg.style.display = 'none';
       });
@@ -1882,8 +1908,8 @@ export default function App() {
         backgroundColor: bgColor,
       });
 
-      // Restore all SVGs after capture
-      allSvgs.forEach((svg, i) => {
+      // Restore overlay SVGs after capture
+      overlaySvgs.forEach((svg, i) => {
         svg.style.display = origSvgDisplays[i] || '';
       });
 

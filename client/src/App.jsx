@@ -895,11 +895,32 @@ function rectsOverlap(a, b) {
            a.y - a.h / 2 > b.y + b.h / 2);
 }
 
+// Test if a line segment (x1,y1)→(x2,y2) intersects an axis-aligned rect
+function lineIntersectsRect(x1, y1, x2, y2, left, top, right, bottom) {
+  // Liang-Barsky algorithm
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x1 - left, right - x1, y1 - top, bottom - y1];
+  let tMin = 0, tMax = 1;
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(p[i]) < 1e-10) {
+      if (q[i] < 0) return false; // parallel and outside
+    } else {
+      const t = q[i] / p[i];
+      if (p[i] < 0) { if (t > tMin) tMin = t; }
+      else { if (t < tMax) tMax = t; }
+      if (tMin > tMax) return false;
+    }
+  }
+  return true;
+}
+
 // Push two rects apart symmetrically (both move half the distance)
 function pushBothApart(a, b) {
   let dx = a.x - b.x;
   let dy = a.y - b.y;
-  const GAP = 12; // minimum pixel gap between markers
+  const GAP = 30; // generous gap so connector lines between logos stay visible
   const overlapX = (a.w + b.w) / 2 + GAP - Math.abs(dx);
   const overlapY = (a.h + b.h) / 2 + GAP - Math.abs(dy);
   if (overlapX <= 0 || overlapY <= 0) return false;
@@ -1095,6 +1116,59 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
             if (a.pinned) { pushAwayFrom(b, a); moved = true; }
             else if (b.pinned) { pushAwayFrom(a, b); moved = true; }
             else { pushBothApart(a, b); moved = true; }
+          }
+        }
+        if (!moved) break;
+      }
+
+      // Step 2c: Connector-line-aware collision resolution
+      // Check if any logo's bounding box crosses another logo's connector line.
+      // If so, push the obstructing logo away from the line.
+      // Connector = line from displaced position (logo center) to actual position (centroid).
+      const LINE_CLEAR = 10; // px clearance around connector lines
+      for (let iter = 0; iter < 40; iter++) {
+        let moved = false;
+        for (let i = 0; i < finalPositions.length; i++) {
+          const fp = finalPositions[i];
+          const cluster = clusters[fp.ci];
+          const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
+          const dist = Math.hypot(fp.x - origPt.x, fp.y - origPt.y);
+          if (dist < 5) continue; // no connector for this logo
+
+          // Check if any OTHER logo's rect intersects this connector line
+          for (let j = 0; j < finalPositions.length; j++) {
+            if (i === j) continue;
+            const other = finalPositions[j];
+            if (other.pinned) continue; // don't move user-placed logos
+
+            // Test if rect `other` intersects line segment from fp → origPt
+            const rectL = other.x - other.w / 2 - LINE_CLEAR;
+            const rectR = other.x + other.w / 2 + LINE_CLEAR;
+            const rectT = other.y - other.h / 2 - LINE_CLEAR;
+            const rectB = other.y + other.h / 2 + LINE_CLEAR;
+
+            // Simple: check if line segment passes through expanded rect
+            // Use parametric line clipping (Cohen-Sutherland style)
+            const lx1 = fp.x, ly1 = fp.y, lx2 = origPt.x, ly2 = origPt.y;
+            if (lineIntersectsRect(lx1, ly1, lx2, ly2, rectL, rectT, rectR, rectB)) {
+              // Push other away from the midpoint of the line segment
+              const midX = (lx1 + lx2) / 2;
+              const midY = (ly1 + ly2) / 2;
+              let dx = other.x - midX;
+              let dy = other.y - midY;
+              const len = Math.hypot(dx, dy) || 1;
+              // Push perpendicular to the line direction for cleaner separation
+              const lineDx = lx2 - lx1;
+              const lineDy = ly2 - ly1;
+              const lineLen = Math.hypot(lineDx, lineDy) || 1;
+              // Perpendicular direction (choose side the logo is already on)
+              let perpX = -lineDy / lineLen;
+              let perpY = lineDx / lineLen;
+              if (perpX * dx + perpY * dy < 0) { perpX = -perpX; perpY = -perpY; }
+              other.x += perpX * 8;
+              other.y += perpY * 8;
+              moved = true;
+            }
           }
         }
         if (!moved) break;
@@ -1712,7 +1786,7 @@ export default function App() {
       const radiusMeters = parseFloat(radius) * 1609.34;
       const degLat = radiusMeters / 111320;
       const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
-      const RING_PADDING = 80; // px margin around ring on all sides
+      const RING_PADDING = 50; // px margin around ring on all sides
 
       // Step 1: Fit to ring bounds — this zoom guarantees the full ring is visible
       const ringBounds = [
@@ -1743,7 +1817,7 @@ export default function App() {
         const radiusMeters = parseFloat(radius) * 1609.34;
         const degLat = radiusMeters / 111320;
         const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
-        const RING_PADDING = 80;
+        const RING_PADDING = 50;
 
         // Fit to ring bounds first — guarantees ring fully visible
         const ringBounds = [

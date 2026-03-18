@@ -781,23 +781,15 @@ body {
   border-radius: 2px;
 }
 
-.sc-cell-wide {
-  width: 100% !important;
-  background: #ffffff !important;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border: 1px solid #e8e8e8;
-  padding: 2px 4px;
-}
-
-.sc-cell-wide img {
-  object-fit: contain;
-  display: block;
-  background: #ffffff;
-  border-radius: 2px;
+.sc-fallback {
+  font-size: 8px;
+  font-weight: 700;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  color: #444;
+  text-align: center;
+  line-height: 1.1;
+  word-break: break-word;
+  padding: 2px;
 }
 
 .sc-cell-text {

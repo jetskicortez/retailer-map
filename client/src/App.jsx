@@ -842,18 +842,12 @@ function buildClusters(map, items) {
       };
     }
 
-    // Multi-marker cluster — compute grid dimensions
-    // Account for wide logos (markerW > 80) that span full rows
+    // Multi-marker cluster — uniform grid dimensions
     const count = members.length;
     const cols = Math.min(count, MAX_CLUSTER_COLS);
-    const wideCount = members.filter((m) => (m.markerW || LOGO_MIN_W) > 80).length;
-    const normalCount = count - wideCount;
-    const normalRows = Math.ceil(normalCount / cols);
-    const WIDE_ROW_H = 36;
+    const rows = Math.ceil(count / cols);
     const gridW = cols * CLUSTER_CELL + (cols - 1) * CLUSTER_GAP + CLUSTER_PAD * 2;
-    const gridH = (normalRows * CLUSTER_CELL + Math.max(0, normalRows - 1) * CLUSTER_GAP)
-      + (wideCount * WIDE_ROW_H + wideCount * CLUSTER_GAP)
-      + CLUSTER_PAD * 2;
+    const gridH = rows * CLUSTER_CELL + (rows - 1) * CLUSTER_GAP + CLUSTER_PAD * 2;
 
     return {
       type: 'cluster',
@@ -862,90 +856,39 @@ function buildClusters(map, items) {
       centroidLatLng: [centroidLL.lat, centroidLL.lng],
       w: gridW + MARKER_PAD,
       h: gridH + MARKER_PAD,
-      cols, rows: normalRows + wideCount, gridW, gridH,
+      cols, rows, gridW, gridH,
     };
   });
 }
 
-// ── Step 2: Create a cluster divIcon showing a mini logo grid ────
-// Wide logos (aspect > 1.8) span the full row; square logos fill grid cells.
+// ── Step 2: Create a cluster divIcon showing a uniform logo grid ────
+// All cells are equal size. Failed logos fall back to brand name text.
 function createClusterGridIcon(cluster, childrenData) {
-  const { items } = cluster;
-  const cols = Math.min(items.length, MAX_CLUSTER_COLS);
-
-  // Classify items as wide or normal based on logo aspect ratio
-  const classified = items.map((item) => {
+  const { items, cols, gridW, gridH } = cluster;
+  const cells = items.map((item) => {
     const child = childrenData.find((c) => c && c.idx === item.idx);
-    const logoUrl = child?.logoUrl;
-    const cached = logoUrl ? logoDimCache[logoUrl] : null;
-    const aspect = cached?.aspect || 1;
-    return { item, child, logoUrl, aspect, wide: aspect > 1.8 };
-  });
-
-  // Sort: wide logos first (they get full rows), then normal logos
-  classified.sort((a, b) => (b.wide ? 1 : 0) - (a.wide ? 1 : 0));
-
-  // Build HTML rows: wide logos get full-width rows, normal logos fill grid
-  const WIDE_H = 36;  // height for wide logo rows
-  const CELL_SIZE = CLUSTER_CELL; // 52px
-  const GAP = CLUSTER_GAP;       // 5px
-  const PAD = CLUSTER_PAD;       // 8px
-  const gridInnerW = cols * CELL_SIZE + (cols - 1) * GAP;
-
-  let html = '';
-  let currentRowH = 0;
-  let totalH = 0;
-  let normalBuffer = [];
-
-  function flushNormals() {
-    if (normalBuffer.length === 0) return;
-    const rowCount = Math.ceil(normalBuffer.length / cols);
-    for (let r = 0; r < rowCount; r++) {
-      if (totalH > 0) totalH += GAP;
-      totalH += CELL_SIZE;
+    if (!child) return '<div class="sc-cell"></div>';
+    const logoUrl = child.logoUrl;
+    const name = (child.name || '').replace(/'/g, "\\'");
+    const shortName = name.length > 10 ? name.substring(0, 9) + '…' : name;
+    if (logoUrl) {
+      const cellFb = child.name ? getFallbackLogoUrl(child.name) : null;
+      // On error: try BrandFetch fallback, then show brand name text
+      const fallbackHtml = `<span class=&quot;sc-fallback&quot;>${shortName}</span>`;
+      const cellErr = cellFb
+        ? `this.onerror=function(){this.parentElement.innerHTML='${fallbackHtml}'};this.src='${cellFb}'`
+        : `this.onerror=null;this.parentElement.innerHTML='${fallbackHtml}'`;
+      return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="44" height="44" style="object-fit:contain;" onerror="${cellErr}" /></div>`;
     }
-    html += normalBuffer.join('');
-    normalBuffer = [];
-  }
-
-  classified.forEach(({ item, child, logoUrl, aspect, wide }) => {
-    const cellFb = child?.name ? getFallbackLogoUrl(child.name) : null;
-    const cellErr = cellFb
-      ? `this.onerror=function(){this.style.display='none'};this.src='${cellFb}'`
-      : "this.style.display='none'";
-
-    if (wide && logoUrl) {
-      // Flush any queued normal logos first
-      flushNormals();
-      if (totalH > 0) totalH += GAP;
-      totalH += WIDE_H;
-      // Wide logo spans full width
-      html += `<div class="sc-cell sc-cell-wide" style="grid-column:1/-1;height:${WIDE_H}px;width:100%;"><img src="${logoUrl}" alt="" style="max-width:${gridInnerW - 4}px;max-height:${WIDE_H - 4}px;object-fit:contain;" onerror="${cellErr}" /></div>`;
-    } else if (logoUrl) {
-      normalBuffer.push(`<div class="sc-cell"><img src="${logoUrl}" alt="" width="44" height="44" style="object-fit:contain;" onerror="${cellErr}" /></div>`);
-    } else {
-      const cfg = getCategoryConfig(child?.category || 'Other');
-      const shortName = (child?.name || '?').split(/\s+/)[0].substring(0, 10);
-      normalBuffer.push(`<div class="sc-cell sc-cell-text" style="background:${cfg.color}22;color:${cfg.color};font-size:9px;font-weight:600;">${shortName}</div>`);
-    }
-  });
-  flushNormals();
-
-  // Recalculate actual grid dimensions
-  const actualGridW = gridInnerW + PAD * 2;
-  const normalCount = classified.filter((c) => !c.wide).length;
-  const normalRows = Math.ceil(normalCount / cols);
-  const wideCount = classified.filter((c) => c.wide).length;
-  const actualGridH = (normalRows * CELL_SIZE + (normalRows > 0 ? (normalRows - 1) * GAP : 0))
-    + (wideCount * WIDE_H + (wideCount > 0 ? wideCount * GAP : 0))
-    + PAD * 2;
+    return `<div class="sc-cell"><span class="sc-fallback">${shortName}</span></div>`;
+  }).join('');
 
   return L.divIcon({
-    html: `<div class="smart-cluster" style="width:${actualGridW}px;height:${actualGridH}px;grid-template-columns:repeat(${cols},${CELL_SIZE}px);">${html}<div class="sc-count">${items.length}</div></div>`,
+    html: `<div class="smart-cluster" style="width:${gridW}px;height:${gridH}px;grid-template-columns:repeat(${cols},${CLUSTER_CELL}px);">${cells}<div class="sc-count">${items.length}</div></div>`,
     className: '',
-    iconSize: [actualGridW, actualGridH],
-    iconAnchor: [actualGridW / 2, actualGridH / 2],
-    popupAnchor: [0, -actualGridH / 2],
+    iconSize: [gridW, gridH],
+    iconAnchor: [gridW / 2, gridH / 2],
+    popupAnchor: [0, -gridH / 2],
   });
 }
 

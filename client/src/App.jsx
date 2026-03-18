@@ -1127,11 +1127,15 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const MAX_CONNECTOR_PX = 100;
         if (isDisplaced && dist <= MAX_CONNECTOR_PX) {
           // Store data for canvas-based export drawing
+          // iconW/iconH = visible logo size (without MARKER_PAD collision buffer)
+          // padW/padH = full bounding box including MARKER_PAD (for re-stamping)
           connectors.push({
             from: Array.isArray(markerLatLng) ? markerLatLng : [markerLatLng.lat, markerLatLng.lng],
             to: cluster.centroidLatLng,
-            iconW: cluster.w,
-            iconH: cluster.h,
+            iconW: cluster.w - MARKER_PAD,
+            iconH: cluster.h - MARKER_PAD,
+            padW: cluster.w,
+            padH: cluster.h,
           });
 
           // Connector line — white with dark outline for visibility
@@ -1346,7 +1350,7 @@ export default function App() {
 
   // Filter state
   const [activeCategories, setActiveCategories] = useState(new Set());
-  const [activeChainSizes, setActiveChainSizes] = useState(new Set());
+  const [activeChainSizes, setActiveChainSizes] = useState(new Set(['National']));
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mapStyle, setMapStyle] = useState(initialStyle); // 'street' or 'satellite' (reads from ?style= URL param)
 
@@ -1431,7 +1435,7 @@ export default function App() {
     setFlyTo(null);
     setFitBounds(null);
     setActiveCategories(new Set());
-    setActiveChainSizes(new Set());
+    setActiveChainSizes(new Set(['National']));
 
     try {
       // Step 1: Geocode subject property via Nominatim
@@ -1822,18 +1826,20 @@ export default function App() {
         const connectors = connectorDataRef.current.map((c) => {
           const fromPt = map.latLngToContainerPoint(c.from);  // displaced marker position
           const toPt = map.latLngToContainerPoint(c.to);      // actual retailer position
-          const iconW = c.iconW || 46;
-          const iconH = c.iconH || 46;
+          const iconW = c.iconW || 46;   // visible logo size (no padding)
+          const iconH = c.iconH || 46;   // visible logo size (no padding)
+          const padW = c.padW || iconW + MARKER_PAD;  // full size with collision buffer
+          const padH = c.padH || iconH + MARKER_PAD;
           const dist = Math.hypot(fromPt.x - toPt.x, fromPt.y - toPt.y);
           return {
             fromX: fromPt.x,
-            fromY: fromPt.y + iconH / 2,  // bottom edge of logo
+            fromY: fromPt.y + iconH / 2,  // bottom edge of VISIBLE logo (not padded box)
             toX: toPt.x,
             toY: toPt.y,
             markerCx: fromPt.x,
             markerCy: fromPt.y,
-            markerW: iconW,
-            markerH: iconH,
+            markerW: padW,   // use padded size for re-stamping (covers full marker area)
+            markerH: padH,
             dist,
           };
         }).filter((c) => c.dist > 5 && c.dist <= 100);
@@ -1870,13 +1876,15 @@ export default function App() {
         });
 
         // Pass 2: Re-stamp marker regions from rawCanvas on top of connector lines
-        // so logos sit cleanly above the lines (connectors go under logos)
-        const STAMP_PAD = 6;
+        // so logos sit cleanly above the lines. Leave bottom 4px exposed so the
+        // connector attachment point at the logo base remains visible.
+        const STAMP_PAD = 4;
+        const BOTTOM_EXPOSE = 4; // px to leave uncovered at bottom for connector attachment
         connectors.forEach(({ markerCx, markerCy, markerW, markerH }) => {
           const boxX = markerCx - markerW / 2 - STAMP_PAD;
           const boxY = markerCy - markerH / 2 - STAMP_PAD;
           const boxW = markerW + STAMP_PAD * 2;
-          const boxH = markerH + STAMP_PAD * 2;
+          const boxH = markerH + STAMP_PAD * 2 - BOTTOM_EXPOSE;
 
           const srcX = boxX * rawScaleX;
           const srcY = boxY * rawScaleY;

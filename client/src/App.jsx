@@ -988,9 +988,15 @@ function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles) {
     leftItems.push(rightItems.pop());
   }
 
-  // Sort each column by original latitude (top to bottom on map)
-  leftItems.sort((a, b) => a.cy - b.cy);
-  rightItems.sort((a, b) => a.cy - b.cy);
+  // Sort each column by angle from property center.
+  // This fans connector lines out naturally without crossing.
+  // Left column: sort by angle so top items point upper-left, bottom items lower-left
+  // Right column: same but mirrored
+  function angleFromProp(c) {
+    return Math.atan2(c.cy - propPt.y, c.cx - propPt.x);
+  }
+  leftItems.sort((a, b) => angleFromProp(a) - angleFromProp(b));
+  rightItems.sort((a, b) => angleFromProp(a) - angleFromProp(b));
 
   // Compute column positions
   // Left column: right-aligned to just outside the ring (or at left margin if ring is far right)
@@ -1961,6 +1967,26 @@ export default function App() {
               boxX * scaleX, boxY * scaleY, boxW * scaleX, boxH * scaleY);
           }
         });
+
+        // Pass 3: Re-stamp property marker region so no connector crosses
+        // over the property label + pin. The property marker is ~160px wide, 76px tall,
+        // anchored at bottom of pin, extending upward.
+        if (data) {
+          const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
+          const propStampW = 200; // generous width to cover label
+          const propStampH = 90;  // covers label + pin
+          const pX = propContPt.x - propStampW / 2;
+          const pY = propContPt.y - propStampH; // extends above anchor
+          const pSrcX = pX * rawScaleX;
+          const pSrcY = pY * rawScaleY;
+          const pSrcW = propStampW * rawScaleX;
+          const pSrcH = propStampH * rawScaleY;
+          if (pSrcX >= 0 && pSrcY >= 0 && pSrcW > 0 && pSrcH > 0 &&
+              pSrcX + pSrcW <= rawCanvas.width && pSrcY + pSrcH <= rawCanvas.height) {
+            ctx.drawImage(rawCanvas, pSrcX, pSrcY, pSrcW, pSrcH,
+              pX * scaleX, pY * scaleY, propStampW * scaleX, propStampH * scaleY);
+          }
+        }
       }
 
       return outCanvas;

@@ -736,7 +736,6 @@ const CLUSTER_GAP = 5;         // px gap between cells
 const CLUSTER_PAD = 8;         // px padding inside cluster border
 const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
 const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
-const MIN_CLUSTER_SIZE = 999;  // disable clustering — all markers stay individual
 
 // Zoom-adaptive extra padding for merge detection:
 // At low zoom we pad more so distant markers merge sooner
@@ -760,6 +759,9 @@ function ensureConnectorPane(map) {
 function buildClusters(map, items) {
   const zoom = map.getZoom();
   const pad = getClusterPadding(zoom);
+  // Auto-enable clustering when retailer count is high (dense corridors)
+  // Fewer than 16 retailers: all individual. 16+: cluster groups of 2+.
+  const MIN_CLUSTER_SIZE = items.length >= 16 ? 2 : 999;
 
   // Convert to pixel positions with bounding box sizes
   const nodes = items.map((item, i) => {
@@ -777,12 +779,15 @@ function buildClusters(map, items) {
   }
   function union(a, b) { parent[find(a)] = find(b); }
 
-  // Merge nodes whose bounding boxes overlap (+ zoom-adaptive padding)
+  // Merge nodes whose actual positions are close together.
+  // For dense areas (16+ items), use a wider proximity threshold to
+  // aggressively cluster and reduce connector line clutter.
+  const proximityPad = items.length >= 16 ? pad + 40 : pad;
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       const ni = nodes[i], nj = nodes[j];
-      const overlapX = (ni.w + nj.w) / 2 + pad - Math.abs(ni.px - nj.px);
-      const overlapY = (ni.h + nj.h) / 2 + pad - Math.abs(ni.py - nj.py);
+      const overlapX = (ni.w + nj.w) / 2 + proximityPad - Math.abs(ni.px - nj.px);
+      const overlapY = (ni.h + nj.h) / 2 + proximityPad - Math.abs(ni.py - nj.py);
       if (overlapX > 0 && overlapY > 0) {
         union(i, j);
       }
@@ -1969,14 +1974,18 @@ export default function App() {
         });
 
         // Pass 3: Re-stamp property marker region so no connector crosses
-        // over the property label + pin. The property marker is ~160px wide, 76px tall,
-        // anchored at bottom of pin, extending upward.
+        // over the property label + pin. Use tight dimensions matching the
+        // actual label+pin icon, not an oversized box that clips nearby connectors.
         if (data) {
           const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
-          const propStampW = 200; // generous width to cover label
-          const propStampH = 90;  // covers label + pin
+          // Match createPropertyIcon: label ~30px tall, pin 46px tall, total ~76px above anchor
+          // Label width varies but ~160px for typical addresses
+          const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
+          const labelW = Math.max(140, streetAddr.length * 7.5 + 24);
+          const propStampW = labelW + 8; // small padding around label
+          const propStampH = 80;         // label (30) + pin (46) + small pad
           const pX = propContPt.x - propStampW / 2;
-          const pY = propContPt.y - propStampH; // extends above anchor
+          const pY = propContPt.y - propStampH;
           const pSrcX = pX * rawScaleX;
           const pSrcY = pY * rawScaleY;
           const pSrcW = propStampW * rawScaleX;

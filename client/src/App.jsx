@@ -1057,6 +1057,56 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       // Step 2: Displace clusters to avoid subject property + each other
       const displaced = displaceClusterRects(map, clusters, propLL);
 
+      // Step 2b: Post-override collision resolution
+      // Apply drag overrides, then push non-dragged markers away from dragged ones
+      const finalPositions = clusters.map((cluster, ci) => {
+        const dp = displaced[ci];
+        if (!dp) return null;
+        const clusterKey = getClusterKey(cluster);
+        const overridePos = dragOverrides.current[clusterKey];
+        const pos = overridePos || dp.displacedLatLng;
+        const pt = map.latLngToContainerPoint(pos);
+        return {
+          x: pt.x, y: pt.y,
+          w: cluster.w, h: cluster.h,
+          pinned: !!overridePos, // user-dragged markers don't move
+          ci,
+        };
+      }).filter(Boolean);
+
+      // Iterative push: pinned markers stay, others get nudged
+      const propPt = map.latLngToContainerPoint(propLL);
+      const propRect = { x: propPt.x, y: propPt.y - (76 + MARKER_PAD * 2) / 2, w: 140 + MARKER_PAD * 2, h: 76 + MARKER_PAD * 2 };
+      for (let iter = 0; iter < 80; iter++) {
+        let moved = false;
+        for (const fp of finalPositions) {
+          if (fp.pinned) continue;
+          // Push away from subject property
+          if (rectsOverlap(fp, propRect)) {
+            pushAwayFrom(fp, propRect);
+            moved = true;
+          }
+        }
+        for (let i = 0; i < finalPositions.length; i++) {
+          for (let j = i + 1; j < finalPositions.length; j++) {
+            const a = finalPositions[i], b = finalPositions[j];
+            if (!rectsOverlap(a, b)) continue;
+            if (a.pinned && b.pinned) continue; // both dragged — don't move either
+            if (a.pinned) { pushAwayFrom(b, a); moved = true; }
+            else if (b.pinned) { pushAwayFrom(a, b); moved = true; }
+            else { pushBothApart(a, b); moved = true; }
+          }
+        }
+        if (!moved) break;
+      }
+
+      // Write resolved positions back (only for non-pinned markers)
+      finalPositions.forEach((fp) => {
+        if (fp.pinned) return;
+        const resolvedLL = map.containerPointToLatLng([fp.x, fp.y]);
+        displaced[fp.ci].displacedLatLng = [resolvedLL.lat, resolvedLL.lng];
+      });
+
       // Step 3: Render each cluster or single marker
       clusters.forEach((cluster, ci) => {
         const dp = displaced[ci];
@@ -1662,7 +1712,7 @@ export default function App() {
       const radiusMeters = parseFloat(radius) * 1609.34;
       const degLat = radiusMeters / 111320;
       const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
-      const RING_PADDING = 160; // px margin around ring on all sides
+      const RING_PADDING = 80; // px margin around ring on all sides
 
       // Step 1: Fit to ring bounds — this zoom guarantees the full ring is visible
       const ringBounds = [
@@ -1693,7 +1743,7 @@ export default function App() {
         const radiusMeters = parseFloat(radius) * 1609.34;
         const degLat = radiusMeters / 111320;
         const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
-        const RING_PADDING = 160;
+        const RING_PADDING = 80;
 
         // Fit to ring bounds first — guarantees ring fully visible
         const ringBounds = [

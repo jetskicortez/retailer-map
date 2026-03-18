@@ -522,14 +522,15 @@ app.get('/api/logo/:domain', async (req, res) => {
     return res.send(cached.buffer);
   }
 
-  // Try BrandFetch URL patterns: symbol first (compact), icon second, logo third
-  // Always: light theme, transparent background, PNG format
+  // Try BrandFetch URL patterns: symbol and icon ONLY (square-friendly).
+  // Skip logo.png and bare domain which return rectangular wordmarks
+  // that don't fit well in cluster grid cells.
   const urls = [
     `https://cdn.brandfetch.io/${domain}/theme/light/symbol.png?c=${clientId}`,
     `https://cdn.brandfetch.io/${domain}/theme/light/icon.png?c=${clientId}`,
-    `https://cdn.brandfetch.io/${domain}/theme/light/logo.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/dark/symbol.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/dark/icon.png?c=${clientId}`,
     `https://cdn.brandfetch.io/${domain}/icon.png?c=${clientId}`,
-    `https://cdn.brandfetch.io/${domain}?c=${clientId}`,
   ];
 
   for (const url of urls) {

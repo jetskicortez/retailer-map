@@ -781,6 +781,25 @@ body {
   border-radius: 2px;
 }
 
+.sc-cell-wide {
+  width: 100% !important;
+  background: #ffffff !important;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #e8e8e8;
+  padding: 2px 4px;
+}
+
+.sc-cell-wide img {
+  object-fit: contain;
+  display: block;
+  background: #ffffff;
+  border-radius: 2px;
+}
+
 .sc-cell-text {
   font-size: 14px;
   font-weight: 700;

@@ -953,7 +953,7 @@ function pushAwayFrom(mover, anchor) {
   return true;
 }
 
-function displaceClusterRects(map, clusters, propertyLatLng) {
+function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles) {
   const rects = clusters.map((c, i) => ({
     x: c.cx, y: c.cy,
     w: c.w, h: c.h,
@@ -972,6 +972,19 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
   const propH = 76 + MARKER_PAD * 2;
   const propRect = { x: propPt.x, y: propPt.y - 76 / 2, w: propW, h: propH };
 
+  // "1 Mile" label exclusion zone — sits at bottom of radius ring
+  let labelRect = null;
+  if (radiusMiles && propertyLatLng) {
+    const radiusMeters = radiusMiles * 1609.34;
+    const degLat = radiusMeters / 111320;
+    const labelLatLng = L.latLng(
+      propertyLatLng.lat - degLat,
+      propertyLatLng.lng
+    );
+    const labelPt = map.latLngToContainerPoint(labelLatLng);
+    labelRect = { x: labelPt.x, y: labelPt.y, w: 100, h: 40 };
+  }
+
   // ── Phase 1: Logos start at actual positions ──
   // No artificial spreading — collision resolution handles spacing.
 
@@ -983,6 +996,11 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
     for (const r of rects) {
       if (rectsOverlap(r, propRect)) {
         pushAwayFrom(r, propRect);
+        moved = true;
+      }
+      // Push away from "1 Mile" label at bottom of radius ring
+      if (labelRect && rectsOverlap(r, labelRect)) {
+        pushAwayFrom(r, labelRect);
         moved = true;
       }
     }
@@ -1018,7 +1036,7 @@ function displaceClusterRects(map, clusters, propertyLatLng) {
 }
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
-function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef }) {
+function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef, radiusMiles }) {
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
@@ -1078,7 +1096,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       const clusters = buildClusters(map, items);
 
       // Step 2: Displace clusters to avoid subject property + each other
-      const displaced = displaceClusterRects(map, clusters, propLL);
+      const displaced = displaceClusterRects(map, clusters, propLL, radiusMiles);
 
       // Step 2b: Post-override collision resolution
       // Apply drag overrides, then push non-dragged markers away from dragged ones
@@ -1371,7 +1389,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       map.off('moveend', debouncedRender);
       map.off('exportrender', onExportRender);
     };
-  }, [children, onMarkerClick, markerRefs, propertyLatLng, map]);
+  }, [children, onMarkerClick, markerRefs, propertyLatLng, radiusMiles, map]);
 
   return null;
 }
@@ -2397,6 +2415,7 @@ export default function App() {
             propertyLatLng={data ? [data.property.lat, data.property.lng] : null}
             connectorDataRef={connectorDataRef}
             isExportingRef={isExportingRef}
+            radiusMiles={parseFloat(radius)}
           >
             {data?.retailers.map((r, i) => {
               if (!filteredRetailers.includes(r)) return null;

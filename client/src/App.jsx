@@ -1872,36 +1872,6 @@ export default function App() {
       // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
 
-      // ── Measure the actual property marker DOM element for accurate clipping ──
-      // This avoids unreliable character-width estimation. getBoundingClientRect
-      // gives the exact rendered position/size of the label + pin.
-      let propBoxContainer = null; // property bounding box in container coords
-      if (data) {
-        const panelRect = panel.getBoundingClientRect();
-        // The property label may overflow its container, so measure it directly
-        const propLabelEl = panel.querySelector('.property-label');
-        const propPinEl = panel.querySelector('.property-pin');
-        const propMarkerEl = panel.querySelector('.property-marker');
-        if (propLabelEl || propMarkerEl) {
-          // Get bounding rects of label and pin, compute union
-          const rects = [propLabelEl, propPinEl, propMarkerEl]
-            .filter(Boolean)
-            .map((el) => el.getBoundingClientRect());
-          const unionLeft = Math.min(...rects.map((r) => r.left));
-          const unionTop = Math.min(...rects.map((r) => r.top));
-          const unionRight = Math.max(...rects.map((r) => r.right));
-          const unionBottom = Math.max(...rects.map((r) => r.bottom));
-          // Convert to container-relative coordinates
-          const PROP_CLIP_PAD = 14; // extra margin + half max stroke width (8/2=4)
-          propBoxContainer = {
-            left:   (unionLeft - panelRect.left) - PROP_CLIP_PAD,
-            top:    (unionTop - panelRect.top) - PROP_CLIP_PAD,
-            right:  (unionRight - panelRect.left) + PROP_CLIP_PAD,
-            bottom: (unionBottom - panelRect.top) + PROP_CLIP_PAD,
-          };
-        }
-      }
-
       // ── Hide ALL connector/vector layers before capture ──
       // We redraw radius ring + connectors on canvas with correct coordinates.
       // Must hide: (1) the connectorPane (Leaflet polylines + dots),
@@ -2005,8 +1975,9 @@ export default function App() {
       }
 
       // Layer 2: Draw connector lines from displaced logo markers to actual positions.
-      // Use connectorDataRef (lat/lng pairs from SmartClusterLayer) + latLngToContainerPoint
-      // for correct container-relative coordinates. Avoids DOM translate3d offset issues.
+      // Lines are drawn in full (no clipping). The property marker is then drawn
+      // on top using canvas primitives (not a rectangular re-stamp) so lines
+      // naturally pass behind the label + pin with no visible buffer zone.
       if (map && data && connectorDataRef.current && connectorDataRef.current.length > 0) {
         const scaleX = EXPORT_W / CAPTURE_W;
         const scaleY = EXPORT_H / CAPTURE_H;
@@ -2014,131 +1985,66 @@ export default function App() {
         const rawScaleY = rawCanvas.height / CAPTURE_H;
 
         const connectors = connectorDataRef.current.map((c) => {
-          const fromPt = map.latLngToContainerPoint(c.from);  // displaced marker position
-          const toPt = map.latLngToContainerPoint(c.to);      // actual retailer position
-          const iconW = c.iconW || 46;   // visible logo size (no padding)
-          const iconH = c.iconH || 46;   // visible logo size (no padding)
-          const padW = c.padW || iconW + MARKER_PAD;  // full size with collision buffer
+          const fromPt = map.latLngToContainerPoint(c.from);
+          const toPt = map.latLngToContainerPoint(c.to);
+          const iconW = c.iconW || 46;
+          const iconH = c.iconH || 46;
+          const padW = c.padW || iconW + MARKER_PAD;
           const padH = c.padH || iconH + MARKER_PAD;
           const dist = Math.hypot(fromPt.x - toPt.x, fromPt.y - toPt.y);
           return {
             fromX: fromPt.x,
-            fromY: fromPt.y + iconH / 2,  // bottom edge of VISIBLE logo (not padded box)
+            fromY: fromPt.y + iconH / 2,
             toX: toPt.x,
             toY: toPt.y,
             markerCx: fromPt.x,
             markerCy: fromPt.y,
-            markerW: padW,   // use padded size for re-stamping (covers full marker area)
+            markerW: padW,
             markerH: padH,
             dist,
           };
         }).filter((c) => c.dist > 5);
 
-        // Use the DOM-measured property bounding box for connector clipping.
-        // propBoxContainer was measured before html2canvas capture, giving exact
-        // pixel positions that account for actual font rendering + CSS layout.
-        const propBox = propBoxContainer;
-
-        // Clip a line segment to exclude the portion inside a rect.
-        // Returns the clipped segment [x1,y1,x2,y2] or null if entirely inside.
-        function clipLineOutsideRect(x1, y1, x2, y2, box) {
-          if (!box) return [x1, y1, x2, y2];
-          const dx = x2 - x1, dy = y2 - y1;
-          const p = [-dx, dx, -dy, dy];
-          const q = [x1 - box.left, box.right - x1, y1 - box.top, box.bottom - y1];
-          let tMin = 0, tMax = 1;
-          for (let i = 0; i < 4; i++) {
-            if (Math.abs(p[i]) < 1e-10) {
-              if (q[i] < 0) return [x1, y1, x2, y2]; // parallel & outside
-            } else {
-              const t = q[i] / p[i];
-              if (p[i] < 0) { if (t > tMin) tMin = t; }
-              else { if (t < tMax) tMax = t; }
-              if (tMin > tMax) return [x1, y1, x2, y2]; // no intersection
-            }
-          }
-          // Line intersects the box between tMin and tMax.
-          // Check which endpoint(s) are inside the box.
-          const fromInside = (x1 >= box.left && x1 <= box.right && y1 >= box.top && y1 <= box.bottom);
-          const toInside   = (x2 >= box.left && x2 <= box.right && y2 >= box.top && y2 <= box.bottom);
-          if (fromInside && toInside) return null; // entirely inside
-          if (toInside) {
-            // "to" end is inside → clip to entry point
-            return [x1, y1, x1 + dx * tMin, y1 + dy * tMin];
-          }
-          if (fromInside) {
-            // "from" end is inside → clip to exit point
-            return [x1 + dx * tMax, y1 + dy * tMax, x2, y2];
-          }
-          // Both outside but line passes through → draw both outer segments
-          // For simplicity, draw from start to entry and from exit to end
-          return [x1, y1, x1 + dx * tMin, y1 + dy * tMin, x1 + dx * tMax, y1 + dy * tMax, x2, y2];
-        }
-
-        // Pass 1: Draw connector lines from bottom of logo to actual position,
-        // clipped around the property marker bounding box.
+        // Pass 1: Draw connector lines in full (no clipping)
         connectors.forEach(({ fromX, fromY, toX, toY }) => {
-          const clipped = clipLineOutsideRect(fromX, fromY, toX, toY, propBox);
-          if (!clipped) return; // line entirely inside property box
+          const x1 = fromX * scaleX, y1 = fromY * scaleY;
+          const x2 = toX * scaleX, y2 = toY * scaleY;
 
-          // Draw line segments (may be 1 or 2 segments if line passes through property box)
-          const segments = clipped.length === 4
-            ? [[clipped[0], clipped[1], clipped[2], clipped[3]]]
-            : [[clipped[0], clipped[1], clipped[2], clipped[3]],
-               [clipped[4], clipped[5], clipped[6], clipped[7]]];
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.lineWidth = 8 * scaleX;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 4 * scaleX;
+          ctx.stroke();
 
-          segments.forEach(([sx1, sy1, sx2, sy2]) => {
-            const a1 = sx1 * scaleX, b1 = sy1 * scaleY;
-            const a2 = sx2 * scaleX, b2 = sy2 * scaleY;
-            // Skip degenerate segments
-            if (Math.hypot(a2 - a1, b2 - b1) < 2) return;
-
-            // Dark outline for visibility on satellite
-            ctx.beginPath();
-            ctx.moveTo(a1, b1);
-            ctx.lineTo(a2, b2);
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.lineWidth = 8 * scaleX;
-            ctx.stroke();
-            // White center
-            ctx.beginPath();
-            ctx.moveTo(a1, b1);
-            ctx.lineTo(a2, b2);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 4 * scaleX;
-            ctx.stroke();
-          });
-
-          // White dot with outline at actual retailer location (only if outside property box)
-          const endX = toX * scaleX, endY = toY * scaleY;
-          const toOutside = !propBox || toX < propBox.left || toX > propBox.right || toY < propBox.top || toY > propBox.bottom;
-          if (toOutside) {
-            ctx.beginPath();
-            ctx.arc(endX, endY, 7 * scaleX, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(endX, endY, 5 * scaleX, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-          }
+          // White dot at actual retailer location
+          ctx.beginPath();
+          ctx.arc(x2, y2, 7 * scaleX, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x2, y2, 5 * scaleX, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
         });
 
-        // Pass 2: Re-stamp marker regions from rawCanvas on top of connector lines
-        // so logos sit cleanly above the lines. Inset by EDGE_INSET on all 4 sides
-        // so connector attachment points are never covered regardless of direction.
-        const EDGE_INSET = 3; // px inset from each edge — connectors visible at all edges
+        // Pass 2: Re-stamp retailer logo marker regions from rawCanvas
+        const EDGE_INSET = 3;
         connectors.forEach(({ markerCx, markerCy, markerW, markerH }) => {
           const boxX = markerCx - markerW / 2 + EDGE_INSET;
           const boxY = markerCy - markerH / 2 + EDGE_INSET;
           const boxW = markerW - EDGE_INSET * 2;
           const boxH = markerH - EDGE_INSET * 2;
-
           const srcX = boxX * rawScaleX;
           const srcY = boxY * rawScaleY;
           const srcW = boxW * rawScaleX;
           const srcH = boxH * rawScaleY;
-
           if (srcX >= 0 && srcY >= 0 && srcW > 0 && srcH > 0 &&
               srcX + srcW <= rawCanvas.width && srcY + srcH <= rawCanvas.height) {
             ctx.drawImage(rawCanvas, srcX, srcY, srcW, srcH,
@@ -2146,24 +2052,112 @@ export default function App() {
           }
         });
 
-        // Pass 3: Re-stamp property marker region so no connector crosses
-        // over the property label + pin. Uses the DOM-measured bounding box
-        // (with extra padding) for pixel-perfect coverage.
-        if (propBoxContainer) {
-          // Expand re-stamp slightly beyond clip zone to catch any stroke residue
-          const STAMP_EXTRA = 4;
-          const pX = propBoxContainer.left - STAMP_EXTRA;
-          const pY = propBoxContainer.top - STAMP_EXTRA;
-          const propStampW = (propBoxContainer.right - propBoxContainer.left) + STAMP_EXTRA * 2;
-          const propStampH = (propBoxContainer.bottom - propBoxContainer.top) + STAMP_EXTRA * 2;
-          const pSrcX = pX * rawScaleX;
-          const pSrcY = pY * rawScaleY;
-          const pSrcW = propStampW * rawScaleX;
-          const pSrcH = propStampH * rawScaleY;
-          if (pSrcX >= 0 && pSrcY >= 0 && pSrcW > 0 && pSrcH > 0 &&
-              pSrcX + pSrcW <= rawCanvas.width && pSrcY + pSrcH <= rawCanvas.height) {
-            ctx.drawImage(rawCanvas, pSrcX, pSrcY, pSrcW, pSrcH,
-              pX * scaleX, pY * scaleY, propStampW * scaleX, propStampH * scaleY);
+        // Pass 3: Draw property marker on top using canvas primitives.
+        // This avoids a rectangular re-stamp that creates a visible buffer zone.
+        // Only the label + pin pixels cover the connector lines.
+        if (data) {
+          const propPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
+          const cx = propPt.x * scaleX;
+          const cy = propPt.y * scaleY; // anchor point = bottom of pin
+          const s = scaleX; // uniform scale factor (3x for 300 DPI)
+
+          const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
+          const labelText = streetAddr.toUpperCase();
+
+          // ── Draw pin (teardrop with gradient) ──
+          const pinW = 36 * s, pinH = 46 * s;
+          const pinCx = cx, pinTop = cy - pinH;
+          ctx.save();
+          ctx.translate(pinCx, pinTop);
+          ctx.scale(s, s);
+          // Shadow
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+          ctx.shadowBlur = 4;
+          ctx.shadowOffsetY = 2;
+          // Teardrop path (same as SVG: M18 43 ... Z, in 36x46 viewBox)
+          ctx.beginPath();
+          ctx.moveTo(18, 43);
+          ctx.bezierCurveTo(18, 43, 34, 27, 34, 16);
+          ctx.bezierCurveTo(34, 8, 27, 2, 18, 2);
+          ctx.bezierCurveTo(9, 2, 2, 8, 2, 16);
+          ctx.bezierCurveTo(2, 27, 18, 43, 18, 43);
+          ctx.closePath();
+          const pinGrad = ctx.createLinearGradient(0, 0, 0, 46);
+          pinGrad.addColorStop(0, '#e2c47a');
+          pinGrad.addColorStop(1, '#c9a84c');
+          ctx.fillStyle = pinGrad;
+          ctx.fill();
+          ctx.shadowColor = 'transparent';
+          ctx.strokeStyle = '#0f1923';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          // Inner circle
+          ctx.beginPath();
+          ctx.arc(18, 16, 7, 0, Math.PI * 2);
+          ctx.fillStyle = '#0f1923';
+          ctx.fill();
+          // Star
+          ctx.beginPath();
+          ctx.moveTo(18, 11);
+          ctx.lineTo(19.5, 14.5);
+          ctx.lineTo(23, 14.8);
+          ctx.lineTo(20.3, 17);
+          ctx.lineTo(21.1, 20.5);
+          ctx.lineTo(18, 18.7);
+          ctx.lineTo(14.9, 20.5);
+          ctx.lineTo(15.7, 17);
+          ctx.lineTo(13, 14.8);
+          ctx.lineTo(16.5, 14.5);
+          ctx.closePath();
+          ctx.fillStyle = '#c9a84c';
+          ctx.fill();
+          ctx.restore();
+
+          // ── Draw label above pin ──
+          const fontSize = 11 * s;
+          const letterSpacing = 1.5 * s;
+          ctx.font = `700 ${fontSize}px "DM Sans", sans-serif`;
+          // Measure text width accounting for letter-spacing
+          const baseWidth = ctx.measureText(labelText).width;
+          const textW = baseWidth + letterSpacing * (labelText.length - 1);
+          const padX = 12 * s, padY = 5 * s;
+          const borderW = 2 * s;
+          const labelBoxW = textW + padX * 2 + borderW * 2;
+          const labelBoxH = fontSize + padY * 2 + borderW * 2;
+          const borderRadius = 3 * s;
+          const labelX = cx - labelBoxW / 2;
+          const labelY = pinTop - 2 * s - labelBoxH; // 2px margin above pin
+
+          // Label shadow
+          ctx.save();
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+          ctx.shadowBlur = 10 * s;
+          ctx.shadowOffsetY = 2 * s;
+          // Border (gold)
+          ctx.beginPath();
+          ctx.roundRect(labelX, labelY, labelBoxW, labelBoxH, borderRadius);
+          ctx.fillStyle = '#c9a84c';
+          ctx.fill();
+          ctx.restore();
+          // Inner background (dark)
+          ctx.beginPath();
+          ctx.roundRect(
+            labelX + borderW, labelY + borderW,
+            labelBoxW - borderW * 2, labelBoxH - borderW * 2,
+            Math.max(1, borderRadius - borderW)
+          );
+          ctx.fillStyle = '#1a1a1a';
+          ctx.fill();
+          // Text (white, letter-spaced)
+          ctx.fillStyle = '#ffffff';
+          ctx.font = `700 ${fontSize}px "DM Sans", sans-serif`;
+          ctx.textBaseline = 'middle';
+          const textStartX = labelX + borderW + padX;
+          const textCenterY = labelY + labelBoxH / 2;
+          let curX = textStartX;
+          for (let i = 0; i < labelText.length; i++) {
+            ctx.fillText(labelText[i], curX, textCenterY);
+            curX += ctx.measureText(labelText[i]).width + letterSpacing;
           }
         }
       }

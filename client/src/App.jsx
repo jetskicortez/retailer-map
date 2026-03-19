@@ -363,9 +363,14 @@ const LOGO_FILES = {
   'at&t': 'ATT.png',
   'aarons': 'Aarons.png',
   "aaron's": 'Aarons.png',
+  'ace hardware': 'Ace Hardware.png',
   'anytime fitness': 'Anytime Fitness.png',
   "arby's": 'Arbys.png',
   'arbys': 'Arbys.png',
+  'bank of america': 'Bank of America.png',
+  'bath & body works': 'Bath and Body Works.png',
+  'bath and body works': 'Bath and Body Works.png',
+  'best buy': 'Best Buy.png',
   'bp': 'BP.png',
   'barnes & noble': 'Barnes and Noble.png',
   'barnes and noble': 'Barnes and Noble.png',
@@ -379,12 +384,23 @@ const LOGO_FILES = {
   'jpmorgan chase': 'Chase Bank.png',
   'the cheesecake factory': 'Cheesecake Factory.png',
   'cheesecake factory': 'Cheesecake Factory.png',
+  "chili's": 'Chilis.png',
+  'chilis': 'Chilis.png',
+  'capital one': 'Capital One.png',
+  'capital one bank': 'Capital One.png',
+  'costco': 'Costco.png',
+  'costco wholesale': 'Costco.png',
   'cracker barrel': 'Cracker Barrel.png',
+  "culver's": 'Culvers.png',
+  'culvers': 'Culvers.png',
   'cracker barrel old country store': 'Cracker Barrel.png',
   'cricket wireless': 'Cricket Wireless.png',
   'dairy queen': 'Dairy Queen.png',
   "denny's": 'Dennys.png',
   'dennys': 'Dennys.png',
+  "dick's sporting goods": 'Dicks Sporting Goods.png',
+  'dicks sporting goods': 'Dicks Sporting Goods.png',
+  'discount tire': 'Discount Tire.png',
   'dollar general': 'Dollar General.png',
   'dg market': 'DG Market.png',
   'dollar tree': 'Dollar Tree.png',
@@ -395,10 +411,19 @@ const LOGO_FILES = {
   'fifth third bank': 'Fifth Third Bank.png',
   'first national bank': 'First National Bank.png',
   'first watch': 'First Watch.png',
+  'five below': 'Five Below.png',
   'five guys': 'Five Guys.png',
+  'firehouse subs': 'Firehouse Subs.png',
+  'firestone': 'Firestone.png',
+  'firestone complete auto care': 'Firestone.png',
+  'foot locker': 'Foot Locker.png',
   "gabe's": 'Gabes.png',
   'gabes': 'Gabes.png',
+  'gamestop': 'GameStop.png',
+  'gnc': 'GNC.png',
   'goodwill': 'Goodwill.png',
+  'goodyear': 'Goodyear.png',
+  'goodyear auto service': 'Goodyear.png',
   'h&r block': 'HR Block.png',
   'hr block': 'HR Block.png',
   'harbor freight': 'Harbor Freight.png',
@@ -408,20 +433,38 @@ const LOGO_FILES = {
   'the home depot': 'Home Depot.png',
   'huntington bank': 'Huntington Bank.png',
   'ihop': 'IHOP.png',
+  'jiffy lube': 'Jiffy Lube.png',
   "jimmy john's": 'Jimmy Johns.png',
   'jimmy johns': 'Jimmy Johns.png',
+  'keybank': 'KeyBank.png',
+  'key bank': 'KeyBank.png',
   "kohl's": 'Kohls.png',
   'kohls': 'Kohls.png',
   'kroger': 'Kroger.png',
   'la fitness': 'LA Fitness.png',
+  'little caesars': 'Little Caesars.png',
+  "little caesar's": 'Little Caesars.png',
   "lowe's": 'Lowes.png',
   "lowe's home improvement": 'Lowes.png',
   'lowes': 'Lowes.png',
+  "macy's": 'Macys.png',
+  'macys': 'Macys.png',
+  'marathon': 'Marathon.png',
+  'marathon gas': 'Marathon.png',
   'marshalls': 'Marshalls.png',
+  'meineke': 'Meineke.png',
+  'meineke car care': 'Meineke.png',
+  'michaels': 'Michaels.png',
+  'midas': 'Midas.png',
   "moe's southwest grill": 'Moes Grill.png',
   'moes grill': 'Moes Grill.png',
+  'office depot': 'Office Depot.png',
+  'officemax': 'Office Depot.png',
+  'old navy': 'Old Navy.png',
   "ollie's bargain outlet": 'Ollies.png',
   'ollies': 'Ollies.png',
+  'outback steakhouse': 'Outback Steakhouse.png',
+  'outback': 'Outback Steakhouse.png',
   'pnc': 'PNC.png',
   'pnc bank': 'PNC.png',
   'panda express': 'Panda Express.png',
@@ -438,6 +481,8 @@ const LOGO_FILES = {
   'qdoba': 'Qdoba.png',
   'qdoba mexican eats': 'Qdoba.png',
   'qdoba mexican grill': 'Qdoba.png',
+  'regions bank': 'Regions Bank.png',
+  'regions': 'Regions Bank.png',
   'rei': 'REI.png',
   'red robin': 'Red Robin.png',
   'red robin gourmet burgers': 'Red Robin.png',
@@ -445,14 +490,22 @@ const LOGO_FILES = {
   'rural king': 'Rural King.png',
   "sam's club": 'Sams Club.png',
   'sams club': 'Sams Club.png',
+  'sephora': 'Sephora.png',
+  'shell': 'Shell.png',
+  'shell gas': 'Shell.png',
   'shop n save': 'Shop n Save.png',
   "shop 'n save": 'Shop n Save.png',
+  'staples': 'Staples.png',
   'state farm': 'State Farm.png',
   "steak 'n shake": 'Steak n Shake.png',
   'steak n shake': 'Steak n Shake.png',
   'subway': 'Subway.png',
   'sunoco': 'Sunoco.png',
+  't-mobile': 'T-Mobile.png',
+  'tmobile': 'T-Mobile.png',
   'tj maxx': 'TJ Maxx.png',
+  "trader joe's": 'Trader Joes.png',
+  'trader joes': 'Trader Joes.png',
   't.j. maxx': 'TJ Maxx.png',
   'taco bell': 'Taco Bell.png',
   'target': 'Target.png',
@@ -463,13 +516,22 @@ const LOGO_FILES = {
   'tractor supply company': 'Tractor Supply Company.png',
   'urban air': 'Urban Air.png',
   'urban outfitters': 'Urban Outfitters.png',
+  'us bank': 'US Bank.png',
+  'u.s. bank': 'US Bank.png',
   'verizon': 'Verizon.png',
   'verizon wireless': 'Verizon.png',
   'walgreens': 'Walgreens.png',
   'walmart': 'Walmart.png',
   'walmart supercenter': 'Walmart.png',
   'walmart neighborhood market': 'Walmart.png',
+  'wells fargo': 'Wells Fargo.png',
+  'wells fargo bank': 'Wells Fargo.png',
   'white castle': 'White Castle.png',
+  'whole foods': 'Whole Foods.png',
+  'whole foods market': 'Whole Foods.png',
+  'wingstop': 'Wingstop.png',
+  "zaxby's": 'Zaxbys.png',
+  'zaxbys': 'Zaxbys.png',
   'american freight': 'American Freight.png',
   "einstein bros. bagels": 'Einstein Bros Bagels.png',
   'einstein bros bagels': 'Einstein Bros Bagels.png',
@@ -656,23 +718,23 @@ function getLogoUrl(retailerName) {
   const { domain, file } = _resolveName(normalized);
   if (!domain && !file) return null;
   const localUrl = file ? `/logos/${file}` : null;
-  const brandfetchUrl = domain
-    ? `https://cdn.brandfetch.io/${domain}/w/200/h/112/theme/light/fallback/404?c=${BRANDFETCH_ID}`
-    : null;
-  // Return BrandFetch as primary, local as fallback
-  return brandfetchUrl || localUrl;
+  // Local logos (212+ PNGs) as primary — reliable, no API dependency
+  // BrandFetch proxy at /api/logo/:domain available as fallback
+  // (requires registered domain origin to return real images)
+  const brandfetchUrl = domain ? `/api/logo/${domain}` : null;
+  return localUrl || brandfetchUrl;
 }
 
-// Get local-only fallback URL for onerror handling
-function getLocalLogoUrl(retailerName) {
+// Get BrandFetch proxy fallback URL for onerror handling (when local logo fails)
+function getFallbackLogoUrl(retailerName) {
   const normalized = retailerName.toLowerCase().trim();
-  const { file } = _resolveName(normalized);
-  return file ? `/logos/${file}` : null;
+  const { domain } = _resolveName(normalized);
+  return domain ? `/api/logo/${domain}` : null;
 }
 
-const LOGO_H = 56; // Fixed height for all logo markers
-const LOGO_MIN_W = 56; // Minimum width (square)
-const LOGO_MAX_W = 130; // Maximum width (very wide logos)
+const LOGO_H = 46; // Fixed height for all logo markers
+const LOGO_MIN_W = 36; // Minimum width (narrow/square logos)
+const LOGO_MAX_W = 150; // Maximum width — auto-expand for wide wordmarks (Dunkin', Subway, etc.)
 
 // Cache of logo natural dimensions: url → { w, h, aspect }
 const logoDimCache = {};
@@ -710,10 +772,10 @@ function createLogoIcon(logoUrl, retailerName) {
   const innerW = markerW - 19;
   const innerH = LOGO_H - 19;
 
-  // Build onerror: try local fallback, then hide if that also fails
-  const localFallback = retailerName ? getLocalLogoUrl(retailerName) : null;
-  const onerror = localFallback
-    ? `this.onerror=function(){this.style.display='none'};this.src='${localFallback}'`
+  // Build onerror: try BrandFetch fallback (since local is primary now), then hide
+  const fallback = retailerName ? getFallbackLogoUrl(retailerName) : null;
+  const onerror = fallback
+    ? `this.onerror=function(){this.style.display='none'};this.src='${fallback}'`
     : "this.style.display='none'";
 
   return L.divIcon({
@@ -730,21 +792,20 @@ function createLogoIcon(logoUrl, retailerName) {
 // Groups overlapping markers into clusters, then displaces clusters/singles
 // so the subject property is never blocked and the map stays clean.
 
-const MARKER_PAD = 8;
+const MARKER_PAD = 14;         // generous breathing room between individual logos
 const CLUSTER_CELL = 52;       // px per logo cell inside cluster grid
 const CLUSTER_GAP = 5;         // px gap between cells
 const CLUSTER_PAD = 8;         // px padding inside cluster border
 const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
 const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
-const MIN_CLUSTER_SIZE = 3;    // minimum items to form a cluster (pairs just push apart)
 
 // Zoom-adaptive extra padding for merge detection:
 // At low zoom we pad more so distant markers merge sooner
 function getClusterPadding(zoom) {
-  if (zoom >= 16) return 4;   // tight: only merge if truly overlapping
-  if (zoom >= 14) return 10;
-  if (zoom >= 12) return 18;
-  return 28;                   // far out: merge aggressively
+  if (zoom >= 16) return 2;    // tight: only merge if truly overlapping
+  if (zoom >= 14) return 6;    // reduced from 10
+  if (zoom >= 12) return 12;   // reduced from 18
+  return 20;                    // reduced from 28
 }
 
 // SVG renderer for connecting lines (html2canvas captures SVG DOM elements reliably)
@@ -760,6 +821,9 @@ function ensureConnectorPane(map) {
 function buildClusters(map, items) {
   const zoom = map.getZoom();
   const pad = getClusterPadding(zoom);
+  // Auto-enable clustering when retailer count is high (dense corridors)
+  // Fewer than 16 retailers: all individual. 16+: cluster groups of 2+.
+  const MIN_CLUSTER_SIZE = items.length >= 16 ? 2 : 999;
 
   // Convert to pixel positions with bounding box sizes
   const nodes = items.map((item, i) => {
@@ -777,12 +841,15 @@ function buildClusters(map, items) {
   }
   function union(a, b) { parent[find(a)] = find(b); }
 
-  // Merge nodes whose bounding boxes overlap (+ zoom-adaptive padding)
+  // Merge nodes whose actual positions are close together.
+  // For dense areas (16+ items), use a wider proximity threshold to
+  // aggressively cluster and reduce connector line clutter.
+  const proximityPad = items.length >= 16 ? pad + 40 : pad;
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       const ni = nodes[i], nj = nodes[j];
-      const overlapX = (ni.w + nj.w) / 2 + pad - Math.abs(ni.px - nj.px);
-      const overlapY = (ni.h + nj.h) / 2 + pad - Math.abs(ni.py - nj.py);
+      const overlapX = (ni.w + nj.w) / 2 + proximityPad - Math.abs(ni.px - nj.px);
+      const overlapY = (ni.h + nj.h) / 2 + proximityPad - Math.abs(ni.py - nj.py);
       if (overlapX > 0 && overlapY > 0) {
         union(i, j);
       }
@@ -837,7 +904,7 @@ function buildClusters(map, items) {
       };
     }
 
-    // Multi-marker cluster — compute grid dimensions
+    // Multi-marker cluster — uniform grid dimensions
     const count = members.length;
     const cols = Math.min(count, MAX_CLUSTER_COLS);
     const rows = Math.ceil(count / cols);
@@ -856,24 +923,26 @@ function buildClusters(map, items) {
   });
 }
 
-// ── Step 2: Create a cluster divIcon showing a mini logo grid ────
+// ── Step 2: Create a cluster divIcon showing a uniform logo grid ────
+// All cells are equal size. Failed logos fall back to brand name text.
 function createClusterGridIcon(cluster, childrenData) {
   const { items, cols, gridW, gridH } = cluster;
   const cells = items.map((item) => {
     const child = childrenData.find((c) => c && c.idx === item.idx);
     if (!child) return '<div class="sc-cell"></div>';
     const logoUrl = child.logoUrl;
+    const name = (child.name || '').replace(/'/g, "\\'");
+    const shortName = name.length > 10 ? name.substring(0, 9) + '…' : name;
     if (logoUrl) {
-      const localFb = child.name ? getLocalLogoUrl(child.name) : null;
-      const cellErr = localFb
-        ? `this.onerror=function(){this.style.display='none'};this.src='${localFb}'`
-        : "this.style.display='none'";
+      const cellFb = child.name ? getFallbackLogoUrl(child.name) : null;
+      // On error: try BrandFetch fallback, then show brand name text
+      const fallbackHtml = `<span class=&quot;sc-fallback&quot;>${shortName}</span>`;
+      const cellErr = cellFb
+        ? `this.onerror=function(){this.parentElement.innerHTML='${fallbackHtml}'};this.src='${cellFb}'`
+        : `this.onerror=null;this.parentElement.innerHTML='${fallbackHtml}'`;
       return `<div class="sc-cell"><img src="${logoUrl}" alt="" width="44" height="44" style="object-fit:contain;" onerror="${cellErr}" /></div>`;
     }
-    // No logo — show initials with category color background
-    const cfg = getCategoryConfig(child.category || 'Other');
-    const initials = (child.name || '?').substring(0, 2);
-    return `<div class="sc-cell sc-cell-text" style="background:${cfg.color}33;color:${cfg.color}">${initials}</div>`;
+    return `<div class="sc-cell"><span class="sc-fallback">${shortName}</span></div>`;
   }).join('');
 
   return L.divIcon({
@@ -893,20 +962,42 @@ function rectsOverlap(a, b) {
            a.y - a.h / 2 > b.y + b.h / 2);
 }
 
+// Test if a line segment (x1,y1)→(x2,y2) intersects an axis-aligned rect
+function lineIntersectsRect(x1, y1, x2, y2, left, top, right, bottom) {
+  // Liang-Barsky algorithm
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x1 - left, right - x1, y1 - top, bottom - y1];
+  let tMin = 0, tMax = 1;
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(p[i]) < 1e-10) {
+      if (q[i] < 0) return false; // parallel and outside
+    } else {
+      const t = q[i] / p[i];
+      if (p[i] < 0) { if (t > tMin) tMin = t; }
+      else { if (t < tMax) tMax = t; }
+      if (tMin > tMax) return false;
+    }
+  }
+  return true;
+}
+
 // Push two rects apart symmetrically (both move half the distance)
 function pushBothApart(a, b) {
   let dx = a.x - b.x;
   let dy = a.y - b.y;
-  const overlapX = (a.w + b.w) / 2 - Math.abs(dx);
-  const overlapY = (a.h + b.h) / 2 - Math.abs(dy);
+  const GAP = 36; // generous gap so connector lines between logos stay visible
+  const overlapX = (a.w + b.w) / 2 + GAP - Math.abs(dx);
+  const overlapY = (a.h + b.h) / 2 + GAP - Math.abs(dy);
   if (overlapX <= 0 || overlapY <= 0) return false;
 
   if (overlapX < overlapY) {
-    const push = Math.sign(dx || 1) * (overlapX / 2 + 1);
+    const push = Math.sign(dx || 1) * (overlapX / 2 + 2);
     a.x += push;
     b.x -= push;
   } else {
-    const push = Math.sign(dy || 1) * (overlapY / 2 + 1);
+    const push = Math.sign(dy || 1) * (overlapY / 2 + 2);
     a.y += push;
     b.y -= push;
   }
@@ -929,59 +1020,111 @@ function pushAwayFrom(mover, anchor) {
   return true;
 }
 
-function displaceClusterRects(map, clusters, propertyLatLng) {
-  const rects = clusters.map((c, i) => ({
-    x: c.cx, y: c.cy,
-    w: c.w, h: c.h,
-    origX: c.cx, origY: c.cy,
-    idx: i,
-  }));
-
-  // Subject property rect (pinned, never moves)
-  // The icon anchor is at [70, 76] (bottom-center), so the marker extends
-  // 76px upward from the lat/lng point. Offset the rect center accordingly.
+function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles) {
+  const mapSize = map.getSize();
   const propPt = map.latLngToContainerPoint(propertyLatLng);
-  const propW = 140 + MARKER_PAD * 2;
-  const propH = 76 + MARKER_PAD * 2;
-  const propRect = { x: propPt.x, y: propPt.y - propH / 2, w: propW, h: propH };
+  const MARGIN_X = 20;  // px from left/right edge
+  const MARGIN_Y = 30;  // px from top/bottom edge
+  const GAP_Y = 10;     // vertical gap between logos in a column
 
-  for (let iter = 0; iter < 60; iter++) {
-    let moved = false;
+  // Compute radius ring position in pixels for column placement
+  const radiusMeters = (radiusMiles || 1) * 1609.34;
+  const degLat = radiusMeters / 111320;
+  const degLng = radiusMeters / (111320 * Math.cos(propertyLatLng.lat * Math.PI / 180));
+  const ringLeftPt = map.latLngToContainerPoint([propertyLatLng.lat, propertyLatLng.lng - degLng]);
+  const ringRightPt = map.latLngToContainerPoint([propertyLatLng.lat, propertyLatLng.lng + degLng]);
+  const ringLeft = ringLeftPt.x;
+  const ringRight = ringRightPt.x;
 
-    // Push away from subject property first (full clear, highest priority)
-    for (const r of rects) {
-      if (rectsOverlap(r, propRect)) {
-        pushAwayFrom(r, propRect);
-        moved = true;
-      }
+  // Split clusters into left/right based on actual position relative to property
+  const leftItems = [];
+  const rightItems = [];
+  clusters.forEach((c, i) => {
+    if (c.cx <= propPt.x) {
+      leftItems.push({ ...c, idx: i });
+    } else {
+      rightItems.push({ ...c, idx: i });
     }
+  });
 
-    // Push all markers/clusters apart from each other symmetrically
-    for (let i = 0; i < rects.length; i++) {
-      for (let j = i + 1; j < rects.length; j++) {
-        if (rectsOverlap(rects[i], rects[j])) {
-          pushBothApart(rects[i], rects[j]);
-          moved = true;
-        }
-      }
-    }
-
-    if (!moved) break;
+  // Balance: if one side has way more, move some to the other
+  while (leftItems.length > rightItems.length + 2) {
+    rightItems.push(leftItems.pop());
+  }
+  while (rightItems.length > leftItems.length + 2) {
+    leftItems.push(rightItems.pop());
   }
 
-  return rects.map((r) => {
-    const displacedLL = map.containerPointToLatLng([r.x, r.y]);
-    const dist = Math.hypot(r.x - r.origX, r.y - r.origY);
+  // Sort each column by angle from property center.
+  // This fans connector lines out naturally without crossing.
+  // Left column: sort by angle so top items point upper-left, bottom items lower-left
+  // Right column: same but mirrored
+  function angleFromProp(c) {
+    return Math.atan2(c.cy - propPt.y, c.cx - propPt.x);
+  }
+  leftItems.sort((a, b) => angleFromProp(a) - angleFromProp(b));
+  rightItems.sort((a, b) => angleFromProp(a) - angleFromProp(b));
+
+  // Compute column positions
+  // Left column: right-aligned to just outside the ring (or at left margin if ring is far right)
+  // Right column: left-aligned to just outside the ring
+  const RING_GAP = 30; // gap between ring edge and logo column
+  const leftColRight = Math.min(ringLeft - RING_GAP, mapSize.x * 0.4);
+  const rightColLeft = Math.max(ringRight + RING_GAP, mapSize.x * 0.6);
+
+  // Layout function: evenly distribute items vertically, aligned to column edge
+  function layoutColumn(items, colEdgeX, alignRight) {
+    if (items.length === 0) return [];
+    const totalH = items.reduce((sum, c) => sum + c.h, 0) + (items.length - 1) * GAP_Y;
+    // Center the column vertically in the usable area
+    const usableTop = MARGIN_Y;
+    const usableBottom = mapSize.y - MARGIN_Y;
+    const usableH = usableBottom - usableTop;
+    let startY = usableTop + Math.max(0, (usableH - totalH) / 2);
+
+    // If items don't fit, compress the gap
+    let effectiveGap = GAP_Y;
+    if (totalH > usableH) {
+      const totalItemH = items.reduce((sum, c) => sum + c.h, 0);
+      effectiveGap = Math.max(2, (usableH - totalItemH) / Math.max(1, items.length - 1));
+      startY = usableTop;
+    }
+
+    return items.map((c) => {
+      const y = startY + c.h / 2;
+      // Align: right-align for left column, left-align for right column
+      const x = alignRight
+        ? Math.max(MARGIN_X + c.w / 2, colEdgeX - c.w / 2)
+        : Math.min(mapSize.x - MARGIN_X - c.w / 2, colEdgeX + c.w / 2);
+      startY += c.h + effectiveGap;
+      return { idx: c.idx, x, y, origX: c.cx, origY: c.cy };
+    });
+  }
+
+  const leftPositions = layoutColumn(leftItems, leftColRight, true);
+  const rightPositions = layoutColumn(rightItems, rightColLeft, false);
+  const allPositions = [...leftPositions, ...rightPositions];
+
+  // Build result indexed by cluster idx
+  const result = clusters.map((c, i) => {
+    const pos = allPositions.find((p) => p.idx === i);
+    if (!pos) {
+      return { idx: i, displacedLatLng: [propertyLatLng.lat, propertyLatLng.lng], wasDisplaced: false };
+    }
+    const displacedLL = map.containerPointToLatLng([pos.x, pos.y]);
+    const dist = Math.hypot(pos.x - pos.origX, pos.y - pos.origY);
     return {
-      idx: r.idx,
+      idx: i,
       displacedLatLng: [displacedLL.lat, displacedLL.lng],
-      wasDisplaced: dist > 3,
+      wasDisplaced: dist > 1,
     };
   });
+
+  return result;
 }
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
-function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef }) {
+function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef, radiusMiles }) {
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
@@ -1041,7 +1184,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       const clusters = buildClusters(map, items);
 
       // Step 2: Displace clusters to avoid subject property + each other
-      const displaced = displaceClusterRects(map, clusters, propLL);
+      const displaced = displaceClusterRects(map, clusters, propLL, radiusMiles);
 
       // Step 3: Render each cluster or single marker
       clusters.forEach((cluster, ci) => {
@@ -1056,7 +1199,7 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
         const finalPt = map.latLngToContainerPoint(markerLatLng);
         const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
         const dist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
-        const isDisplaced = !!overridePos || dist > 5;
+        const isDisplaced = !!overridePos || dist > 1;
 
         if (cluster.type === 'single') {
           const item = cluster.items[0];
@@ -1078,7 +1221,14 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           if (markerRefs) markerRefs.current[`r-${item.idx}`] = marker;
           layers.addLayer(marker);
         } else {
-          const icon = createClusterGridIcon(cluster, children);
+          let icon;
+          try {
+            icon = createClusterGridIcon(cluster, children);
+          } catch (err) {
+            console.error('Cluster icon error:', err, cluster);
+            // Fallback to simple icon
+            icon = L.divIcon({ html: `<div style="background:white;padding:4px;border-radius:4px;">${cluster.items.length} retailers</div>`, className: '', iconSize: [100, 30] });
+          }
           const marker = L.marker(markerLatLng, { icon, draggable: true });
 
           const names = cluster.items.map((item) => {
@@ -1108,38 +1258,59 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
           layers.addLayer(marker);
         }
 
-        // Draw connector line from marker to actual map location
+        // Draw connector line from logo to actual map location
         if (isDisplaced) {
           // Store data for canvas-based export drawing
-          // cluster.w / cluster.h already include padding from buildClusters
+          // iconW/iconH = visible logo size (without MARKER_PAD collision buffer)
+          // padW/padH = full bounding box including MARKER_PAD (for re-stamping)
           connectors.push({
             from: Array.isArray(markerLatLng) ? markerLatLng : [markerLatLng.lat, markerLatLng.lng],
-            to: cluster.centroidLatLng, // already an array from buildClusters
-            iconW: cluster.w,
-            iconH: cluster.h,
+            to: cluster.centroidLatLng,
+            iconW: cluster.w - MARKER_PAD,
+            iconH: cluster.h - MARKER_PAD,
+            padW: cluster.w,
+            padH: cluster.h,
           });
 
-          // Connector line — colony red, 4pt weight, rendered below markers
+          // Connector line — white with dark outline for visibility
+          const shadow = L.polyline(
+            [markerLatLng, cluster.centroidLatLng],
+            {
+              weight: 8,
+              color: '#000000',
+              opacity: 0.3,
+              interactive: false,
+              pane: 'connectorPane',
+            }
+          );
+          lines.addLayer(shadow);
           const line = L.polyline(
             [markerLatLng, cluster.centroidLatLng],
             {
               weight: 4,
-              color: '#c8102e',
-              opacity: 0.85,
+              color: '#ffffff',
+              opacity: 1,
               interactive: false,
               pane: 'connectorPane',
             }
           );
           lines.addLayer(line);
 
-          // Filled dot at the actual location
+          // White dot with dark outline at actual location
+          const dotShadow = L.circleMarker(cluster.centroidLatLng, {
+            radius: 7,
+            fillColor: '#000000',
+            fillOpacity: 0.3,
+            stroke: false,
+            interactive: false,
+            pane: 'connectorPane',
+          });
+          lines.addLayer(dotShadow);
           const dot = L.circleMarker(cluster.centroidLatLng, {
             radius: 5,
-            fillColor: '#c8102e',
+            fillColor: '#ffffff',
             fillOpacity: 1,
-            stroke: true,
-            color: '#ffffff',
-            weight: 2.5,
+            stroke: false,
             interactive: false,
             pane: 'connectorPane',
           });
@@ -1175,15 +1346,22 @@ function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng
       debouncedRender();
     };
 
+    // Export-safe re-render: recalculates positions preserving drag overrides
+    const onExportRender = () => {
+      render();
+    };
+
     map.on('zoomend', onZoom);
     map.on('moveend', debouncedRender);
+    map.on('exportrender', onExportRender);
 
     return () => {
       if (timer) clearTimeout(timer);
       map.off('zoomend', onZoom);
       map.off('moveend', debouncedRender);
+      map.off('exportrender', onExportRender);
     };
-  }, [children, onMarkerClick, markerRefs, propertyLatLng, map]);
+  }, [children, onMarkerClick, markerRefs, propertyLatLng, radiusMiles, map]);
 
   return null;
 }
@@ -1297,8 +1475,12 @@ function exportCSV(property, retailers) {
 
 // ── Main App ─────────────────────────────────────────────────────
 export default function App() {
+  // Read URL params for automation (Puppeteer can pass ?style=satellite)
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const initialStyle = urlParams.get('style') || 'street';
+
   const [address, setAddress] = useState('');
-  const [radius, setRadius] = useState('3');
+  const [radius, setRadius] = useState('1');
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [error, setError] = useState('');
@@ -1309,9 +1491,9 @@ export default function App() {
 
   // Filter state
   const [activeCategories, setActiveCategories] = useState(new Set());
-  const [activeChainSizes, setActiveChainSizes] = useState(new Set());
+  const [activeChainSizes, setActiveChainSizes] = useState(new Set(['National']));
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mapStyle, setMapStyle] = useState('street'); // 'street' or 'satellite'
+  const [mapStyle, setMapStyle] = useState(initialStyle); // 'street' or 'satellite' (reads from ?style= URL param)
 
   const markerRefs = useRef({});
   const connectorDataRef = useRef([]);
@@ -1394,7 +1576,7 @@ export default function App() {
     setFlyTo(null);
     setFitBounds(null);
     setActiveCategories(new Set());
-    setActiveChainSizes(new Set());
+    setActiveChainSizes(new Set(['National']));
 
     try {
       // Step 1: Geocode subject property via Nominatim
@@ -1608,40 +1790,102 @@ export default function App() {
       map.invalidateSize({ animate: false });
     }
 
-    // Center on subject property and zoom to fit all retailers
+    // Center on subject property with the radius ring fully visible + clean margins.
+    // Strategy: fit to ring bounds first (guarantees ring visibility), then zoom out
+    // further only if retailers fall outside. Always re-center on property.
     if (map && data) {
       const propLatLng = [data.property.lat, data.property.lng];
-      const allPts = [
-        propLatLng,
-        ...data.retailers.map((r) => [r.lat, r.lng]),
-      ];
-      // Fit bounds to determine the right zoom level
-      map.fitBounds(allPts, {
-        padding: [60, 60],
-        maxZoom: 15,
-        animate: false,
-      });
+      const radiusMeters = parseFloat(radius) * 1609.34;
+      const degLat = radiusMeters / 111320;
+      const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
+      const RING_PADDING = 42; // px margin around ring on all sides
 
-      // Re-center on subject property so the radius circle is centered in export
-      const fitZoom = map.getZoom();
-      map.setView(propLatLng, fitZoom, { animate: false });
+      // Step 1: Fit to ring bounds — this zoom guarantees the full ring is visible
+      const ringBounds = [
+        [data.property.lat - degLat, data.property.lng - degLng],
+        [data.property.lat + degLat, data.property.lng + degLng],
+      ];
+      map.fitBounds(ringBounds, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
+      const ringZoom = map.getZoom();
+
+      // Step 2: Fit to all VISIBLE points (ring + filtered retailers) — may zoom out further for outliers
+      const visibleRetailers = filteredRetailers.length > 0 ? filteredRetailers : data.retailers;
+      const allPts = [propLatLng, ...ringBounds, ...visibleRetailers.map((r) => [r.lat, r.lng])];
+      map.fitBounds(allPts, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
+      const allZoom = map.getZoom();
+
+      // Use whichever zoom is more zoomed out (smaller number)
+      const finalZoom = Math.min(ringZoom, allZoom);
+      map.setView(propLatLng, finalZoom, { animate: false });
     }
 
-    // Wait for tiles to load and layout to settle
-    await new Promise((r) => setTimeout(r, 1000));
+    // Wait for layout to settle, then force Leaflet to fully recalculate
+    await new Promise((r) => setTimeout(r, 500));
     if (map) {
       map.invalidateSize({ animate: false });
+
+      if (data) {
+        const propLatLng = [data.property.lat, data.property.lng];
+        const radiusMeters = parseFloat(radius) * 1609.34;
+        const degLat = radiusMeters / 111320;
+        const degLng = radiusMeters / (111320 * Math.cos(data.property.lat * Math.PI / 180));
+        const RING_PADDING = 42;
+
+        // Fit to ring bounds first — guarantees ring fully visible
+        const ringBounds = [
+          [data.property.lat - degLat, data.property.lng - degLng],
+          [data.property.lat + degLat, data.property.lng + degLng],
+        ];
+        map.fitBounds(ringBounds, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
+        const ringZoom = map.getZoom();
+
+        // Also fit to all VISIBLE retailers — may zoom out further for outliers
+        const visibleRetailers = filteredRetailers.length > 0 ? filteredRetailers : data.retailers;
+        const allPts = [propLatLng, ...ringBounds, ...visibleRetailers.map((r) => [r.lat, r.lng])];
+        map.fitBounds(allPts, { padding: [RING_PADDING, RING_PADDING], maxZoom: 15, animate: false });
+        const allZoom = map.getZoom();
+
+        const finalZoom = Math.min(ringZoom, allZoom);
+
+        // Force a complete pixel-origin reset so SVG overlays
+        // re-render at the correct position after container resize
+        map.setView(propLatLng, finalZoom, { animate: false });
+        map.invalidateSize({ animate: false });
+        // Nudge zoom to force Leaflet to recalculate all SVG transforms
+        map.setZoom(finalZoom - 0.01, { animate: false });
+        map.setView(propLatLng, finalZoom, { animate: false });
+      }
     }
-    // Extra settle for tile rendering
-    await new Promise((r) => setTimeout(r, 500));
+    // Wait for tiles to render at final position
+    await new Promise((r) => setTimeout(r, 2000));
+
+    // Force SmartClusterLayer to re-render at the export-sized map dimensions
+    // so connector positions are recalculated correctly for the new viewport.
+    // Uses custom 'exportrender' event to preserve user's manual drag overrides
+    // (unlike zoomend which would clear them).
+    if (map) {
+      map.fire('exportrender');
+    }
+    await new Promise((r) => setTimeout(r, 500)); // wait for render to complete
 
     const fixed = fixObjectFitForExport(panel);
     try {
-      // ── Single capture + connector compositing ──
-      // Hide the connector SVG pane (we draw connectors manually on canvas)
+      // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
-      const connectorPane = map?.getPane('connectorPane');
-      if (connectorPane) connectorPane.style.display = 'none';
+
+      // Hide ALL SVGs except those inside marker icons (property pin, etc.)
+      // We redraw radius ring + connectors on canvas with correct coordinates.
+      // Leaflet renders ALL polylines in a single SVG regardless of pane, so we
+      // must hide every SVG. Marker SVGs (inside .leaflet-marker-icon) are excluded.
+      const allSvgs = [...panel.querySelectorAll('svg')];
+      const svgsToHide = allSvgs.filter((svg) =>
+        !svg.closest('.leaflet-marker-icon') && !svg.closest('.property-marker')
+      );
+      const origSvgDisplays = [];
+      svgsToHide.forEach((svg) => {
+        origSvgDisplays.push(svg.style.display);
+        svg.style.display = 'none';
+      });
 
       const rawCanvas = await html2canvas(panel, {
         width: CAPTURE_W,
@@ -1654,8 +1898,10 @@ export default function App() {
         backgroundColor: bgColor,
       });
 
-      // Restore connector pane
-      if (connectorPane) connectorPane.style.display = '';
+      // Restore SVGs after capture
+      svgsToHide.forEach((svg, i) => {
+        svg.style.display = origSvgDisplays[i] || '';
+      });
 
       // Build output canvas at 300 DPI landscape letter
       const outCanvas = document.createElement('canvas');
@@ -1668,60 +1914,121 @@ export default function App() {
       // Layer 1: Full capture (tiles + markers)
       ctx.drawImage(rawCanvas, 0, 0, EXPORT_W, EXPORT_H);
 
-      // Layer 2: Draw connector lines, then re-stamp marker regions on top
-      if (map && connectorDataRef.current.length > 0) {
+      // Layer 1.5: Draw radius ring directly on canvas (avoids SVG offset bug)
+      if (map && data) {
+        const scaleX = EXPORT_W / CAPTURE_W;
+        const scaleY = EXPORT_H / CAPTURE_H;
+        const lat = data.property.lat;
+        const lng = data.property.lng;
+        const propPt = map.latLngToContainerPoint([lat, lng]);
+        const radiusMeters = parseFloat(radius) * 1609.34;
+
+        // Calculate pixel radius: offset by radius in degrees latitude (~111,320 m/deg)
+        const degOffset = radiusMeters / 111320;
+        const northPt = map.latLngToContainerPoint([lat + degOffset, lng]);
+        const pxRadius = Math.abs(propPt.y - northPt.y);
+
+        ctx.beginPath();
+        ctx.arc(propPt.x * scaleX, propPt.y * scaleY, pxRadius * scaleX, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(200, 169, 81, 0.7)';
+        ctx.lineWidth = 4 * scaleX;
+        ctx.setLineDash([8 * scaleX, 6 * scaleX]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(200, 169, 81, 0.04)';
+        ctx.fill();
+
+        // Draw radius label at the bottom of the ring
+        const radiusLabel = parseFloat(radius) === 1 ? '1 Mile' : `${radius} Miles`;
+        const labelX = propPt.x * scaleX;
+        const labelY = (propPt.y + pxRadius) * scaleY + 18 * scaleY;
+        const labelFontSize = Math.round(13 * scaleX);
+        ctx.font = `600 ${labelFontSize}px "Gotham", "Montserrat", Arial, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        // Background pill behind text
+        const metrics = ctx.measureText(radiusLabel);
+        const pillW = metrics.width + 16 * scaleX;
+        const pillH = labelFontSize + 10 * scaleX;
+        ctx.fillStyle = 'rgba(200, 169, 81, 0.85)';
+        const pillR = pillH / 2;
+        ctx.beginPath();
+        ctx.roundRect(labelX - pillW / 2, labelY - 3 * scaleX, pillW, pillH, pillR);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(radiusLabel, labelX, labelY);
+      }
+
+      // Layer 2: Draw connector lines from displaced logo markers to actual positions.
+      // Use connectorDataRef (lat/lng pairs from SmartClusterLayer) + latLngToContainerPoint
+      // for correct container-relative coordinates. Avoids DOM translate3d offset issues.
+      if (map && data && connectorDataRef.current && connectorDataRef.current.length > 0) {
         const scaleX = EXPORT_W / CAPTURE_W;
         const scaleY = EXPORT_H / CAPTURE_H;
         const rawScaleX = rawCanvas.width / CAPTURE_W;
         const rawScaleY = rawCanvas.height / CAPTURE_H;
-        const EXPORT_MARKER_PAD = 12; // Extra padding around marker box for re-stamping
 
-        // Pre-compute all connector screen coordinates
-        const connectorPts = connectorDataRef.current.map(({ from, to, iconW, iconH }) => {
-          const fromPt = map.latLngToContainerPoint(L.latLng(from[0], from[1]));
-          const toPt = map.latLngToContainerPoint(L.latLng(to[0], to[1]));
-          return { fromPt, toPt, iconW, iconH };
-        });
+        const connectors = connectorDataRef.current.map((c) => {
+          const fromPt = map.latLngToContainerPoint(c.from);  // displaced marker position
+          const toPt = map.latLngToContainerPoint(c.to);      // actual retailer position
+          const iconW = c.iconW || 46;   // visible logo size (no padding)
+          const iconH = c.iconH || 46;   // visible logo size (no padding)
+          const padW = c.padW || iconW + MARKER_PAD;  // full size with collision buffer
+          const padH = c.padH || iconH + MARKER_PAD;
+          const dist = Math.hypot(fromPt.x - toPt.x, fromPt.y - toPt.y);
+          return {
+            fromX: fromPt.x,
+            fromY: fromPt.y + iconH / 2,  // bottom edge of VISIBLE logo (not padded box)
+            toX: toPt.x,
+            toY: toPt.y,
+            markerCx: fromPt.x,
+            markerCy: fromPt.y,
+            markerW: padW,   // use padded size for re-stamping (covers full marker area)
+            markerH: padH,
+            dist,
+          };
+        }).filter((c) => c.dist > 5);
 
-        // Pass 1: Draw all connector lines (clipped to marker edge so tail attaches)
-        connectorPts.forEach(({ fromPt, toPt, iconW, iconH }) => {
-          // Clip line start from marker center to marker box edge
-          const dx = toPt.x - fromPt.x;
-          const dy = toPt.y - fromPt.y;
-          const halfW = iconW / 2;
-          const halfH = iconH / 2;
-          // Find where the line from center to target exits the marker box
-          let t = 1; // parameter along line; 0 = center, 1 = target
-          if (dx !== 0) t = Math.min(t, halfW / Math.abs(dx));
-          if (dy !== 0) t = Math.min(t, halfH / Math.abs(dy));
-          const edgeX = (fromPt.x + dx * t) * scaleX;
-          const edgeY = (fromPt.y + dy * t) * scaleY;
-          const x2 = toPt.x * scaleX, y2 = toPt.y * scaleY;
+        // Pass 1: Draw connector lines from bottom of logo to actual position
+        connectors.forEach(({ fromX, fromY, toX, toY }) => {
+          const x1 = fromX * scaleX, y1 = fromY * scaleY;
+          const x2 = toX * scaleX, y2 = toY * scaleY;
 
+          // Dark outline for visibility on satellite
           ctx.beginPath();
-          ctx.moveTo(edgeX, edgeY);
+          ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
-          ctx.strokeStyle = 'rgba(200, 16, 46, 0.85)';
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.lineWidth = 8 * scaleX;
+          ctx.stroke();
+          // White center
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 4 * scaleX;
           ctx.stroke();
 
-          // Filled dot at the actual location
-          const dotR = 5 * scaleX;
+          // White dot with outline at actual location
           ctx.beginPath();
-          ctx.arc(x2, y2, dotR, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(200, 16, 46, 1)';
+          ctx.arc(x2, y2, 7 * scaleX, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
           ctx.fill();
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2.5 * scaleX;
-          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x2, y2, 5 * scaleX, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
         });
 
-        // Pass 2: Re-stamp marker/cluster regions from original capture on top
-        connectorPts.forEach(({ fromPt, iconW, iconH }) => {
-          const boxX = fromPt.x - iconW / 2 - EXPORT_MARKER_PAD;
-          const boxY = fromPt.y - iconH / 2 - EXPORT_MARKER_PAD;
-          const boxW = iconW + EXPORT_MARKER_PAD * 2;
-          const boxH = iconH + EXPORT_MARKER_PAD * 2;
+        // Pass 2: Re-stamp marker regions from rawCanvas on top of connector lines
+        // so logos sit cleanly above the lines. Inset by EDGE_INSET on all 4 sides
+        // so connector attachment points are never covered regardless of direction.
+        const EDGE_INSET = 3; // px inset from each edge — connectors visible at all edges
+        connectors.forEach(({ markerCx, markerCy, markerW, markerH }) => {
+          const boxX = markerCx - markerW / 2 + EDGE_INSET;
+          const boxY = markerCy - markerH / 2 + EDGE_INSET;
+          const boxW = markerW - EDGE_INSET * 2;
+          const boxH = markerH - EDGE_INSET * 2;
 
           const srcX = boxX * rawScaleX;
           const srcY = boxY * rawScaleY;
@@ -1734,6 +2041,30 @@ export default function App() {
               boxX * scaleX, boxY * scaleY, boxW * scaleX, boxH * scaleY);
           }
         });
+
+        // Pass 3: Re-stamp property marker region so no connector crosses
+        // over the property label + pin. Use tight dimensions matching the
+        // actual label+pin icon, not an oversized box that clips nearby connectors.
+        if (data) {
+          const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
+          // Match createPropertyIcon: label ~30px tall, pin 46px tall, total ~76px above anchor
+          // Label width varies but ~160px for typical addresses
+          const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
+          const labelW = Math.max(140, streetAddr.length * 7.5 + 24);
+          const propStampW = labelW + 8; // small padding around label
+          const propStampH = 80;         // label (30) + pin (46) + small pad
+          const pX = propContPt.x - propStampW / 2;
+          const pY = propContPt.y - propStampH;
+          const pSrcX = pX * rawScaleX;
+          const pSrcY = pY * rawScaleY;
+          const pSrcW = propStampW * rawScaleX;
+          const pSrcH = propStampH * rawScaleY;
+          if (pSrcX >= 0 && pSrcY >= 0 && pSrcW > 0 && pSrcH > 0 &&
+              pSrcX + pSrcW <= rawCanvas.width && pSrcY + pSrcH <= rawCanvas.height) {
+            ctx.drawImage(rawCanvas, pSrcX, pSrcY, pSrcW, pSrcH,
+              pX * scaleX, pY * scaleY, propStampW * scaleX, propStampH * scaleY);
+          }
+        }
       }
 
       return outCanvas;
@@ -1756,7 +2087,7 @@ export default function App() {
         }
       }
     }
-  }, [data, mapStyle]);
+  }, [data, mapStyle, filteredRetailers]);
 
   // Export map as high-res PNG (8.5×11 landscape)
   const handleExportImage = useCallback(async () => {
@@ -2080,6 +2411,7 @@ export default function App() {
             propertyLatLng={data ? [data.property.lat, data.property.lng] : null}
             connectorDataRef={connectorDataRef}
             isExportingRef={isExportingRef}
+            radiusMiles={parseFloat(radius)}
           >
             {data?.retailers.map((r, i) => {
               if (!filteredRetailers.includes(r)) return null;

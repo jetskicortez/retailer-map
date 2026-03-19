@@ -504,6 +504,64 @@ app.post('/api/places-nearby', async (req, res) => {
   }
 });
 
+// ── BrandFetch Logo Proxy ────────────────────────────────────────
+// BrandFetch blocks localhost origins and programmatic access.
+// This proxy fetches logos server-side with proper headers and caches them.
+const logoCache = new Map(); // domain -> { buffer, contentType, timestamp }
+const LOGO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+app.get('/api/logo/:domain', async (req, res) => {
+  const { domain } = req.params;
+  const clientId = '1idmdqs82nFxq8ItTXO';
+
+  // Check cache
+  const cached = logoCache.get(domain);
+  if (cached && Date.now() - cached.timestamp < LOGO_CACHE_TTL) {
+    res.set('Content-Type', cached.contentType);
+    res.set('Cache-Control', 'public, max-age=86400');
+    return res.send(cached.buffer);
+  }
+
+  // Try BrandFetch URL patterns: symbol and icon ONLY (square-friendly).
+  // Skip logo.png and bare domain which return rectangular wordmarks
+  // that don't fit well in cluster grid cells.
+  const urls = [
+    `https://cdn.brandfetch.io/${domain}/theme/light/symbol.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/light/icon.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/dark/symbol.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/dark/icon.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/icon.png?c=${clientId}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        redirect: 'follow',
+        headers: {
+          'Referer': 'https://thecolonyagency.com/',
+          'Origin': 'https://thecolonyagency.com',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'image/png,image/webp,image/*,*/*',
+        },
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      if (response.ok && contentType.includes('image')) {
+        const buffer = Buffer.from(await response.arrayBuffer());
+        logoCache.set(domain, { buffer, contentType, timestamp: Date.now() });
+        res.set('Content-Type', contentType);
+        res.set('Cache-Control', 'public, max-age=86400');
+        return res.send(buffer);
+      }
+    } catch {
+      // Try next URL pattern
+    }
+  }
+
+  // All patterns failed
+  res.status(404).json({ error: 'Logo not found' });
+});
+
 // Only start listening when run directly (not when imported by Vercel)
 if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {

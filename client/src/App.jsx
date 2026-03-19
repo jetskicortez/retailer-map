@@ -1872,29 +1872,23 @@ export default function App() {
       // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
 
-      // ── Measure the property marker DOM element for tight re-stamping ──
-      let propBoxContainer = null;
+      // ── Measure property label and pin SEPARATELY for independent re-stamping ──
+      // Each element gets its own tight bounding box so connector lines can
+      // pass between the label and pin (no single merged rectangle covering the gap).
+      const propElementBoxes = []; // array of {left,top,right,bottom} in container coords
       if (data) {
         const panelRect = panel.getBoundingClientRect();
         const propLabelEl = panel.querySelector('.property-label');
         const propPinEl = panel.querySelector('.property-pin');
-        const propMarkerEl = panel.querySelector('.property-marker');
-        if (propLabelEl || propMarkerEl) {
-          const rects = [propLabelEl, propPinEl, propMarkerEl]
-            .filter(Boolean)
-            .map((el) => el.getBoundingClientRect());
-          const unionLeft = Math.min(...rects.map((r) => r.left));
-          const unionTop = Math.min(...rects.map((r) => r.top));
-          const unionRight = Math.max(...rects.map((r) => r.right));
-          const unionBottom = Math.max(...rects.map((r) => r.bottom));
-          // Zero padding — tight to the actual rendered pixels
-          propBoxContainer = {
-            left:   (unionLeft - panelRect.left),
-            top:    (unionTop - panelRect.top),
-            right:  (unionRight - panelRect.left),
-            bottom: (unionBottom - panelRect.top),
-          };
-        }
+        [propLabelEl, propPinEl].filter(Boolean).forEach((el) => {
+          const r = el.getBoundingClientRect();
+          propElementBoxes.push({
+            left:   r.left - panelRect.left,
+            top:    r.top - panelRect.top,
+            right:  r.right - panelRect.left,
+            bottom: r.bottom - panelRect.top,
+          });
+        });
       }
 
       // ── Hide ALL connector/vector layers before capture ──
@@ -2077,24 +2071,24 @@ export default function App() {
           }
         });
 
-        // Pass 3: Re-stamp property marker from rawCanvas with zero padding.
-        // The tight bounds match the label rectangle + pin exactly, so no
-        // visible buffer zone — the re-stamp rectangle IS the marker shape.
-        if (propBoxContainer) {
-          const pX = propBoxContainer.left;
-          const pY = propBoxContainer.top;
-          const propStampW = propBoxContainer.right - propBoxContainer.left;
-          const propStampH = propBoxContainer.bottom - propBoxContainer.top;
+        // Pass 3: Re-stamp property label and pin INDEPENDENTLY from rawCanvas.
+        // Each element gets its own tight re-stamp so connector lines can pass
+        // through the gap between them — no single merged rectangle.
+        propElementBoxes.forEach((box) => {
+          const pX = box.left;
+          const pY = box.top;
+          const pW = box.right - box.left;
+          const pH = box.bottom - box.top;
           const pSrcX = pX * rawScaleX;
           const pSrcY = pY * rawScaleY;
-          const pSrcW = propStampW * rawScaleX;
-          const pSrcH = propStampH * rawScaleY;
+          const pSrcW = pW * rawScaleX;
+          const pSrcH = pH * rawScaleY;
           if (pSrcX >= 0 && pSrcY >= 0 && pSrcW > 0 && pSrcH > 0 &&
               pSrcX + pSrcW <= rawCanvas.width && pSrcY + pSrcH <= rawCanvas.height) {
             ctx.drawImage(rawCanvas, pSrcX, pSrcY, pSrcW, pSrcH,
-              pX * scaleX, pY * scaleY, propStampW * scaleX, propStampH * scaleY);
+              pX * scaleX, pY * scaleY, pW * scaleX, pH * scaleY);
           }
-        }
+        });
       }
 
       return outCanvas;

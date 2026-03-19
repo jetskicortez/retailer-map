@@ -1872,6 +1872,31 @@ export default function App() {
       // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
 
+      // ── Measure the property marker DOM element for tight re-stamping ──
+      let propBoxContainer = null;
+      if (data) {
+        const panelRect = panel.getBoundingClientRect();
+        const propLabelEl = panel.querySelector('.property-label');
+        const propPinEl = panel.querySelector('.property-pin');
+        const propMarkerEl = panel.querySelector('.property-marker');
+        if (propLabelEl || propMarkerEl) {
+          const rects = [propLabelEl, propPinEl, propMarkerEl]
+            .filter(Boolean)
+            .map((el) => el.getBoundingClientRect());
+          const unionLeft = Math.min(...rects.map((r) => r.left));
+          const unionTop = Math.min(...rects.map((r) => r.top));
+          const unionRight = Math.max(...rects.map((r) => r.right));
+          const unionBottom = Math.max(...rects.map((r) => r.bottom));
+          // Zero padding — tight to the actual rendered pixels
+          propBoxContainer = {
+            left:   (unionLeft - panelRect.left),
+            top:    (unionTop - panelRect.top),
+            right:  (unionRight - panelRect.left),
+            bottom: (unionBottom - panelRect.top),
+          };
+        }
+      }
+
       // ── Hide ALL connector/vector layers before capture ──
       // We redraw radius ring + connectors on canvas with correct coordinates.
       // Must hide: (1) the connectorPane (Leaflet polylines + dots),
@@ -2052,112 +2077,22 @@ export default function App() {
           }
         });
 
-        // Pass 3: Draw property marker on top using canvas primitives.
-        // This avoids a rectangular re-stamp that creates a visible buffer zone.
-        // Only the label + pin pixels cover the connector lines.
-        if (data) {
-          const propPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
-          const cx = propPt.x * scaleX;
-          const cy = propPt.y * scaleY; // anchor point = bottom of pin
-          const s = scaleX; // uniform scale factor (3x for 300 DPI)
-
-          const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
-          const labelText = streetAddr.toUpperCase();
-
-          // ── Draw pin (teardrop with gradient) ──
-          const pinW = 36 * s, pinH = 46 * s;
-          const pinCx = cx, pinTop = cy - pinH;
-          ctx.save();
-          ctx.translate(pinCx, pinTop);
-          ctx.scale(s, s);
-          // Shadow
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-          ctx.shadowBlur = 4;
-          ctx.shadowOffsetY = 2;
-          // Teardrop path (same as SVG: M18 43 ... Z, in 36x46 viewBox)
-          ctx.beginPath();
-          ctx.moveTo(18, 43);
-          ctx.bezierCurveTo(18, 43, 34, 27, 34, 16);
-          ctx.bezierCurveTo(34, 8, 27, 2, 18, 2);
-          ctx.bezierCurveTo(9, 2, 2, 8, 2, 16);
-          ctx.bezierCurveTo(2, 27, 18, 43, 18, 43);
-          ctx.closePath();
-          const pinGrad = ctx.createLinearGradient(0, 0, 0, 46);
-          pinGrad.addColorStop(0, '#e2c47a');
-          pinGrad.addColorStop(1, '#c9a84c');
-          ctx.fillStyle = pinGrad;
-          ctx.fill();
-          ctx.shadowColor = 'transparent';
-          ctx.strokeStyle = '#0f1923';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          // Inner circle
-          ctx.beginPath();
-          ctx.arc(18, 16, 7, 0, Math.PI * 2);
-          ctx.fillStyle = '#0f1923';
-          ctx.fill();
-          // Star
-          ctx.beginPath();
-          ctx.moveTo(18, 11);
-          ctx.lineTo(19.5, 14.5);
-          ctx.lineTo(23, 14.8);
-          ctx.lineTo(20.3, 17);
-          ctx.lineTo(21.1, 20.5);
-          ctx.lineTo(18, 18.7);
-          ctx.lineTo(14.9, 20.5);
-          ctx.lineTo(15.7, 17);
-          ctx.lineTo(13, 14.8);
-          ctx.lineTo(16.5, 14.5);
-          ctx.closePath();
-          ctx.fillStyle = '#c9a84c';
-          ctx.fill();
-          ctx.restore();
-
-          // ── Draw label above pin ──
-          const fontSize = 11 * s;
-          const letterSpacing = 1.5 * s;
-          ctx.font = `700 ${fontSize}px "DM Sans", sans-serif`;
-          // Measure text width accounting for letter-spacing
-          const baseWidth = ctx.measureText(labelText).width;
-          const textW = baseWidth + letterSpacing * (labelText.length - 1);
-          const padX = 12 * s, padY = 5 * s;
-          const borderW = 2 * s;
-          const labelBoxW = textW + padX * 2 + borderW * 2;
-          const labelBoxH = fontSize + padY * 2 + borderW * 2;
-          const borderRadius = 3 * s;
-          const labelX = cx - labelBoxW / 2;
-          const labelY = pinTop - 2 * s - labelBoxH; // 2px margin above pin
-
-          // Label shadow
-          ctx.save();
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-          ctx.shadowBlur = 10 * s;
-          ctx.shadowOffsetY = 2 * s;
-          // Border (gold)
-          ctx.beginPath();
-          ctx.roundRect(labelX, labelY, labelBoxW, labelBoxH, borderRadius);
-          ctx.fillStyle = '#c9a84c';
-          ctx.fill();
-          ctx.restore();
-          // Inner background (dark)
-          ctx.beginPath();
-          ctx.roundRect(
-            labelX + borderW, labelY + borderW,
-            labelBoxW - borderW * 2, labelBoxH - borderW * 2,
-            Math.max(1, borderRadius - borderW)
-          );
-          ctx.fillStyle = '#1a1a1a';
-          ctx.fill();
-          // Text (white, letter-spaced)
-          ctx.fillStyle = '#ffffff';
-          ctx.font = `700 ${fontSize}px "DM Sans", sans-serif`;
-          ctx.textBaseline = 'middle';
-          const textStartX = labelX + borderW + padX;
-          const textCenterY = labelY + labelBoxH / 2;
-          let curX = textStartX;
-          for (let i = 0; i < labelText.length; i++) {
-            ctx.fillText(labelText[i], curX, textCenterY);
-            curX += ctx.measureText(labelText[i]).width + letterSpacing;
+        // Pass 3: Re-stamp property marker from rawCanvas with zero padding.
+        // The tight bounds match the label rectangle + pin exactly, so no
+        // visible buffer zone — the re-stamp rectangle IS the marker shape.
+        if (propBoxContainer) {
+          const pX = propBoxContainer.left;
+          const pY = propBoxContainer.top;
+          const propStampW = propBoxContainer.right - propBoxContainer.left;
+          const propStampH = propBoxContainer.bottom - propBoxContainer.top;
+          const pSrcX = pX * rawScaleX;
+          const pSrcY = pY * rawScaleY;
+          const pSrcW = propStampW * rawScaleX;
+          const pSrcH = propStampH * rawScaleY;
+          if (pSrcX >= 0 && pSrcY >= 0 && pSrcW > 0 && pSrcH > 0 &&
+              pSrcX + pSrcW <= rawCanvas.width && pSrcY + pSrcH <= rawCanvas.height) {
+            ctx.drawImage(rawCanvas, pSrcX, pSrcY, pSrcW, pSrcH,
+              pX * scaleX, pY * scaleY, propStampW * scaleX, propStampH * scaleY);
           }
         }
       }

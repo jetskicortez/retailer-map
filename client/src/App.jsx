@@ -1872,6 +1872,36 @@ export default function App() {
       // ── Single capture — connectors render directly via Leaflet SVG ──
       const bgColor = mapStyle === 'satellite' ? '#1a2e1a' : '#f2efe9';
 
+      // ── Measure the actual property marker DOM element for accurate clipping ──
+      // This avoids unreliable character-width estimation. getBoundingClientRect
+      // gives the exact rendered position/size of the label + pin.
+      let propBoxContainer = null; // property bounding box in container coords
+      if (data) {
+        const panelRect = panel.getBoundingClientRect();
+        // The property label may overflow its container, so measure it directly
+        const propLabelEl = panel.querySelector('.property-label');
+        const propPinEl = panel.querySelector('.property-pin');
+        const propMarkerEl = panel.querySelector('.property-marker');
+        if (propLabelEl || propMarkerEl) {
+          // Get bounding rects of label and pin, compute union
+          const rects = [propLabelEl, propPinEl, propMarkerEl]
+            .filter(Boolean)
+            .map((el) => el.getBoundingClientRect());
+          const unionLeft = Math.min(...rects.map((r) => r.left));
+          const unionTop = Math.min(...rects.map((r) => r.top));
+          const unionRight = Math.max(...rects.map((r) => r.right));
+          const unionBottom = Math.max(...rects.map((r) => r.bottom));
+          // Convert to container-relative coordinates
+          const PROP_CLIP_PAD = 14; // extra margin + half max stroke width (8/2=4)
+          propBoxContainer = {
+            left:   (unionLeft - panelRect.left) - PROP_CLIP_PAD,
+            top:    (unionTop - panelRect.top) - PROP_CLIP_PAD,
+            right:  (unionRight - panelRect.left) + PROP_CLIP_PAD,
+            bottom: (unionBottom - panelRect.top) + PROP_CLIP_PAD,
+          };
+        }
+      }
+
       // Hide ALL SVGs except those inside marker icons (property pin, etc.)
       // We redraw radius ring + connectors on canvas with correct coordinates.
       // Leaflet renders ALL polylines in a single SVG regardless of pane, so we
@@ -1988,24 +2018,10 @@ export default function App() {
           };
         }).filter((c) => c.dist > 5);
 
-        // Compute property marker bounding box for connector clipping.
-        // Lines that pass through this zone are clipped so they never
-        // overlap or get cut off by the property label + pin.
-        let propBox = null;
-        if (data) {
-          const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
-          const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
-          const pLabelW = Math.max(140, streetAddr.length * 9.5 + 28);
-          const PROP_PAD = 24; // generous breathing room around property marker
-          const pBoxW = pLabelW + 8 + PROP_PAD * 2;
-          const pBoxH = 86 + PROP_PAD * 2;
-          propBox = {
-            left:   propContPt.x - pBoxW / 2,
-            top:    propContPt.y - 86 - PROP_PAD,  // property icon sits above anchor
-            right:  propContPt.x + pBoxW / 2,
-            bottom: propContPt.y + PROP_PAD,
-          };
-        }
+        // Use the DOM-measured property bounding box for connector clipping.
+        // propBoxContainer was measured before html2canvas capture, giving exact
+        // pixel positions that account for actual font rendering + CSS layout.
+        const propBox = propBoxContainer;
 
         // Clip a line segment to exclude the portion inside a rect.
         // Returns the clipped segment [x1,y1,x2,y2] or null if entirely inside.
@@ -2115,17 +2131,15 @@ export default function App() {
         });
 
         // Pass 3: Re-stamp property marker region so no connector crosses
-        // over the property label + pin. Uses the same padded bounding box
-        // as the connector clipping to ensure full coverage.
-        if (data) {
-          const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
-          const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
-          const labelW = Math.max(140, streetAddr.length * 9.5 + 28);
-          const PROP_STAMP_PAD = 26; // must exceed clipping PROP_PAD to fully cover line residue
-          const propStampW = labelW + 8 + PROP_STAMP_PAD * 2;
-          const propStampH = 86 + PROP_STAMP_PAD * 2;
-          const pX = propContPt.x - propStampW / 2;
-          const pY = propContPt.y - 86 - PROP_STAMP_PAD;
+        // over the property label + pin. Uses the DOM-measured bounding box
+        // (with extra padding) for pixel-perfect coverage.
+        if (propBoxContainer) {
+          // Expand re-stamp slightly beyond clip zone to catch any stroke residue
+          const STAMP_EXTRA = 4;
+          const pX = propBoxContainer.left - STAMP_EXTRA;
+          const pY = propBoxContainer.top - STAMP_EXTRA;
+          const propStampW = (propBoxContainer.right - propBoxContainer.left) + STAMP_EXTRA * 2;
+          const propStampH = (propBoxContainer.bottom - propBoxContainer.top) + STAMP_EXTRA * 2;
           const pSrcX = pX * rawScaleX;
           const pSrcY = pY * rawScaleY;
           const pSrcW = propStampW * rawScaleX;

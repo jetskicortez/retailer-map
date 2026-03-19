@@ -50,8 +50,8 @@ function getStreetAddress(fullAddress) {
 
 function createPropertyIcon(streetAddress) {
   const label = streetAddress || 'SUBJECT PROPERTY';
-  // Estimate label width: ~7.5px per character at the label font size, min 140px
-  const labelW = Math.max(140, label.length * 7.5 + 24);
+  // Estimate label width: ~9.5px per character (11px uppercase + 1.5px letter-spacing), min 140px
+  const labelW = Math.max(140, label.length * 9.5 + 28);
   const html = `<div class="property-marker">
     <div class="property-pulse"></div>
     <div class="property-label">${label}</div>
@@ -1995,13 +1995,13 @@ export default function App() {
         if (data) {
           const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
           const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
-          const pLabelW = Math.max(140, streetAddr.length * 7.5 + 24);
-          const PROP_PAD = 10; // extra breathing room around property marker
+          const pLabelW = Math.max(140, streetAddr.length * 9.5 + 28);
+          const PROP_PAD = 24; // generous breathing room around property marker
           const pBoxW = pLabelW + 8 + PROP_PAD * 2;
-          const pBoxH = 80 + PROP_PAD * 2;
+          const pBoxH = 86 + PROP_PAD * 2;
           propBox = {
             left:   propContPt.x - pBoxW / 2,
-            top:    propContPt.y - 80 - PROP_PAD,  // property icon sits above anchor
+            top:    propContPt.y - 86 - PROP_PAD,  // property icon sits above anchor
             right:  propContPt.x + pBoxW / 2,
             bottom: propContPt.y + PROP_PAD,
           };
@@ -2120,12 +2120,12 @@ export default function App() {
         if (data) {
           const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
           const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
-          const labelW = Math.max(140, streetAddr.length * 7.5 + 24);
-          const PROP_STAMP_PAD = 12; // generous padding to cover any line residue
+          const labelW = Math.max(140, streetAddr.length * 9.5 + 28);
+          const PROP_STAMP_PAD = 26; // must exceed clipping PROP_PAD to fully cover line residue
           const propStampW = labelW + 8 + PROP_STAMP_PAD * 2;
-          const propStampH = 80 + PROP_STAMP_PAD * 2;
+          const propStampH = 86 + PROP_STAMP_PAD * 2;
           const pX = propContPt.x - propStampW / 2;
-          const pY = propContPt.y - 80 - PROP_STAMP_PAD;
+          const pY = propContPt.y - 86 - PROP_STAMP_PAD;
           const pSrcX = pX * rawScaleX;
           const pSrcY = pY * rawScaleY;
           const pSrcW = propStampW * rawScaleX;

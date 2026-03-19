@@ -1902,10 +1902,17 @@ export default function App() {
         }
       }
 
-      // Hide ALL SVGs except those inside marker icons (property pin, etc.)
+      // ── Hide ALL connector/vector layers before capture ──
       // We redraw radius ring + connectors on canvas with correct coordinates.
-      // Leaflet renders ALL polylines in a single SVG regardless of pane, so we
-      // must hide every SVG. Marker SVGs (inside .leaflet-marker-icon) are excluded.
+      // Must hide: (1) the connectorPane (Leaflet polylines + dots),
+      // (2) ALL overlay SVGs (radius ring, any other vectors),
+      // (3) any Canvas renderer elements.
+      // Connector pane — hide the entire pane div (works for both SVG & Canvas renderers)
+      const connectorPane = map ? map.getPane('connectorPane') : null;
+      const origConnectorDisplay = connectorPane ? connectorPane.style.display : '';
+      if (connectorPane) connectorPane.style.display = 'none';
+
+      // Hide overlay SVGs (radius ring etc.) but preserve marker icon SVGs
       const allSvgs = [...panel.querySelectorAll('svg')];
       const svgsToHide = allSvgs.filter((svg) =>
         !svg.closest('.leaflet-marker-icon') && !svg.closest('.property-marker')
@@ -1915,6 +1922,11 @@ export default function App() {
         origSvgDisplays.push(svg.style.display);
         svg.style.display = 'none';
       });
+
+      // Also hide any Canvas renderer elements (Leaflet may use canvas for vectors)
+      const overlayCanvases = [...panel.querySelectorAll('.leaflet-overlay-pane canvas')];
+      const origCanvasDisplays = overlayCanvases.map((c) => c.style.display);
+      overlayCanvases.forEach((c) => { c.style.display = 'none'; });
 
       const rawCanvas = await html2canvas(panel, {
         width: CAPTURE_W,
@@ -1927,9 +1939,13 @@ export default function App() {
         backgroundColor: bgColor,
       });
 
-      // Restore SVGs after capture
+      // Restore all hidden elements after capture
+      if (connectorPane) connectorPane.style.display = origConnectorDisplay;
       svgsToHide.forEach((svg, i) => {
         svg.style.display = origSvgDisplays[i] || '';
+      });
+      overlayCanvases.forEach((c, i) => {
+        c.style.display = origCanvasDisplays[i] || '';
       });
 
       // Build output canvas at 300 DPI landscape letter

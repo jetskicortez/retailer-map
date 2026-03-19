@@ -1988,35 +1988,108 @@ export default function App() {
           };
         }).filter((c) => c.dist > 5);
 
-        // Pass 1: Draw connector lines from bottom of logo to actual position
+        // Compute property marker bounding box for connector clipping.
+        // Lines that pass through this zone are clipped so they never
+        // overlap or get cut off by the property label + pin.
+        let propBox = null;
+        if (data) {
+          const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
+          const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
+          const pLabelW = Math.max(140, streetAddr.length * 7.5 + 24);
+          const PROP_PAD = 10; // extra breathing room around property marker
+          const pBoxW = pLabelW + 8 + PROP_PAD * 2;
+          const pBoxH = 80 + PROP_PAD * 2;
+          propBox = {
+            left:   propContPt.x - pBoxW / 2,
+            top:    propContPt.y - 80 - PROP_PAD,  // property icon sits above anchor
+            right:  propContPt.x + pBoxW / 2,
+            bottom: propContPt.y + PROP_PAD,
+          };
+        }
+
+        // Clip a line segment to exclude the portion inside a rect.
+        // Returns the clipped segment [x1,y1,x2,y2] or null if entirely inside.
+        function clipLineOutsideRect(x1, y1, x2, y2, box) {
+          if (!box) return [x1, y1, x2, y2];
+          const dx = x2 - x1, dy = y2 - y1;
+          const p = [-dx, dx, -dy, dy];
+          const q = [x1 - box.left, box.right - x1, y1 - box.top, box.bottom - y1];
+          let tMin = 0, tMax = 1;
+          for (let i = 0; i < 4; i++) {
+            if (Math.abs(p[i]) < 1e-10) {
+              if (q[i] < 0) return [x1, y1, x2, y2]; // parallel & outside
+            } else {
+              const t = q[i] / p[i];
+              if (p[i] < 0) { if (t > tMin) tMin = t; }
+              else { if (t < tMax) tMax = t; }
+              if (tMin > tMax) return [x1, y1, x2, y2]; // no intersection
+            }
+          }
+          // Line intersects the box between tMin and tMax.
+          // Check which endpoint(s) are inside the box.
+          const fromInside = (x1 >= box.left && x1 <= box.right && y1 >= box.top && y1 <= box.bottom);
+          const toInside   = (x2 >= box.left && x2 <= box.right && y2 >= box.top && y2 <= box.bottom);
+          if (fromInside && toInside) return null; // entirely inside
+          if (toInside) {
+            // "to" end is inside → clip to entry point
+            return [x1, y1, x1 + dx * tMin, y1 + dy * tMin];
+          }
+          if (fromInside) {
+            // "from" end is inside → clip to exit point
+            return [x1 + dx * tMax, y1 + dy * tMax, x2, y2];
+          }
+          // Both outside but line passes through → draw both outer segments
+          // For simplicity, draw from start to entry and from exit to end
+          return [x1, y1, x1 + dx * tMin, y1 + dy * tMin, x1 + dx * tMax, y1 + dy * tMax, x2, y2];
+        }
+
+        // Pass 1: Draw connector lines from bottom of logo to actual position,
+        // clipped around the property marker bounding box.
         connectors.forEach(({ fromX, fromY, toX, toY }) => {
-          const x1 = fromX * scaleX, y1 = fromY * scaleY;
-          const x2 = toX * scaleX, y2 = toY * scaleY;
+          const clipped = clipLineOutsideRect(fromX, fromY, toX, toY, propBox);
+          if (!clipped) return; // line entirely inside property box
 
-          // Dark outline for visibility on satellite
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-          ctx.lineWidth = 8 * scaleX;
-          ctx.stroke();
-          // White center
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 4 * scaleX;
-          ctx.stroke();
+          // Draw line segments (may be 1 or 2 segments if line passes through property box)
+          const segments = clipped.length === 4
+            ? [[clipped[0], clipped[1], clipped[2], clipped[3]]]
+            : [[clipped[0], clipped[1], clipped[2], clipped[3]],
+               [clipped[4], clipped[5], clipped[6], clipped[7]]];
 
-          // White dot with outline at actual location
-          ctx.beginPath();
-          ctx.arc(x2, y2, 7 * scaleX, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(x2, y2, 5 * scaleX, 0, Math.PI * 2);
-          ctx.fillStyle = '#ffffff';
-          ctx.fill();
+          segments.forEach(([sx1, sy1, sx2, sy2]) => {
+            const a1 = sx1 * scaleX, b1 = sy1 * scaleY;
+            const a2 = sx2 * scaleX, b2 = sy2 * scaleY;
+            // Skip degenerate segments
+            if (Math.hypot(a2 - a1, b2 - b1) < 2) return;
+
+            // Dark outline for visibility on satellite
+            ctx.beginPath();
+            ctx.moveTo(a1, b1);
+            ctx.lineTo(a2, b2);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.lineWidth = 8 * scaleX;
+            ctx.stroke();
+            // White center
+            ctx.beginPath();
+            ctx.moveTo(a1, b1);
+            ctx.lineTo(a2, b2);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4 * scaleX;
+            ctx.stroke();
+          });
+
+          // White dot with outline at actual retailer location (only if outside property box)
+          const endX = toX * scaleX, endY = toY * scaleY;
+          const toOutside = !propBox || toX < propBox.left || toX > propBox.right || toY < propBox.top || toY > propBox.bottom;
+          if (toOutside) {
+            ctx.beginPath();
+            ctx.arc(endX, endY, 7 * scaleX, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(endX, endY, 5 * scaleX, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+          }
         });
 
         // Pass 2: Re-stamp marker regions from rawCanvas on top of connector lines
@@ -2042,18 +2115,17 @@ export default function App() {
         });
 
         // Pass 3: Re-stamp property marker region so no connector crosses
-        // over the property label + pin. Use tight dimensions matching the
-        // actual label+pin icon, not an oversized box that clips nearby connectors.
+        // over the property label + pin. Uses the same padded bounding box
+        // as the connector clipping to ensure full coverage.
         if (data) {
           const propContPt = map.latLngToContainerPoint([data.property.lat, data.property.lng]);
-          // Match createPropertyIcon: label ~30px tall, pin 46px tall, total ~76px above anchor
-          // Label width varies but ~160px for typical addresses
           const streetAddr = getStreetAddress(data.property.display) || 'SUBJECT PROPERTY';
           const labelW = Math.max(140, streetAddr.length * 7.5 + 24);
-          const propStampW = labelW + 8; // small padding around label
-          const propStampH = 80;         // label (30) + pin (46) + small pad
+          const PROP_STAMP_PAD = 12; // generous padding to cover any line residue
+          const propStampW = labelW + 8 + PROP_STAMP_PAD * 2;
+          const propStampH = 80 + PROP_STAMP_PAD * 2;
           const pX = propContPt.x - propStampW / 2;
-          const pY = propContPt.y - propStampH;
+          const pY = propContPt.y - 80 - PROP_STAMP_PAD;
           const pSrcX = pX * rawScaleX;
           const pSrcY = pY * rawScaleY;
           const pSrcW = propStampW * rawScaleX;

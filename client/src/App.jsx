@@ -8,7 +8,6 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-// markercluster removed — using custom displacement layer instead
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 

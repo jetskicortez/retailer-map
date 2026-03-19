@@ -229,22 +229,11 @@ The map uses a custom hybrid clustering + collision-avoidance system (not Leafle
 ### PNG Export (`handleExportImage`)
 1. Hides map controls (zoom, attribution)
 2. Fixes `object-fit` images for html2canvas compatibility
-3. Measures property label and pin DOM elements independently via `getBoundingClientRect()`
-4. Hides all SVG overlays and connector pane (avoids translate3d offset bugs in html2canvas)
-5. Captures the map panel at 3× scale via `html2canvas` → `rawCanvas` (tiles + markers, no vectors)
-6. Restores hidden elements
-7. Composites output canvas at 300 DPI landscape letter (3300×2550):
-   - Layer 1: `rawCanvas` (map tiles + all markers)
-   - Layer 1.5: Radius ring (canvas-drawn to avoid SVG offset bug)
-   - Layer 2: Connector lines drawn in full (no clipping — lines pass behind markers)
-   - Layer 3: Re-stamp retailer logo regions from `rawCanvas` (logos sit on top of lines)
-   - Layer 3.5: Re-stamp property label and pin **independently** from `rawCanvas` (each as its own tight rectangle — no merged bounding box, no padding)
-8. Downloads as `retailer-map.png`
-
-**Important**: The property label and pin must be re-stamped as separate elements, never merged into a single bounding box. A merged box copies map tiles from the gap between label and pin, creating a visible buffer zone that covers connector lines. See `.claude/EXPORT-PIPELINE-CORRECTIONS.md` for full details.
+3. Renders the map panel at 3× scale via `html2canvas`
+4. Downloads as `retailer-map.png`
 
 ### PDF Export (`handleExportPDF`)
-1. Same canvas compositing pipeline as PNG export
+1. Same html2canvas capture at 3× scale
 2. Calculates landscape layout to fit the image
 3. Generates PDF via `jsPDF` with the map image embedded
 4. Downloads as `retailer-map.pdf`

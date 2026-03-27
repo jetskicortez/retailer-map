@@ -1410,3 +1410,123 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── Survey Form (entry screen) ───────────────────────────────────── */
+.survey-form-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 20px;
+}
+
+.survey-form {
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 32px;
+  border: 1px solid var(--border);
+}
+
+.survey-form-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 4px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.survey-form-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.survey-form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  margin-top: 16px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.survey-form-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+
+.survey-form-input:focus {
+  border-color: var(--gold);
+}
+
+.survey-form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: 'DM Mono', 'Courier New', monospace;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.survey-form-textarea:focus {
+  border-color: var(--gold);
+}
+
+.survey-form-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.survey-form-error {
+  color: #f44336;
+  font-size: 13px;
+  margin-top: 8px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.survey-form-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  background: var(--gold);
+  color: var(--bg);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0.5px;
+  transition: background 0.15s;
+}
+
+.survey-form-btn:hover {
+  background: var(--gold-hover);
+}
+
+.survey-form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  text-align: center;
+  font-family: 'DM Sans', sans-serif;
+}

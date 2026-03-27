@@ -9,6 +9,7 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" }
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/survey", "destination": "/index.html" }
   ]
 }

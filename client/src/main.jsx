@@ -5,8 +5,10 @@ import SurveyMap from './SurveyMap.jsx';
 import './index.css';
 
 function Root() {
-  const mode = new URLSearchParams(window.location.search).get('mode');
-  return mode === 'survey' ? <SurveyMap /> : <App />;
+  const isSurvey =
+    window.location.pathname === '/survey' ||
+    new URLSearchParams(window.location.search).get('mode') === 'survey';
+  return isSurvey ? <SurveyMap /> : <App />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

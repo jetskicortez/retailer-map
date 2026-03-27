@@ -123,6 +123,108 @@ function decodeHashData() {
   }
 }
 
+// ── Input Form (shown when no hash data) ─────────────────────────────
+function SurveyForm({ onSubmit }) {
+  const [title, setTitle] = useState('');
+  const [textInput, setTextInput] = useState('');
+  const [parseError, setParseError] = useState('');
+
+  const placeholder = `Paste properties — one per line:
+Property Name | Address | SF | Asking Rent | Notes
+
+Example:
+Etna Towne Centre | 550 Butler St, Etna, PA 15223 | 3,344 | Withheld | Newest build, flex-friendly
+Jane Street Commons | 2300 Jane St, Pittsburgh, PA 15203 | 4,800 | $1.13/SF | Renovated center
+
+Or paste JSON:
+[{"name":"...","address":"...","sf":"...","askingRent":"..."}]`;
+
+  const handleSubmit = () => {
+    setParseError('');
+    const text = textInput.trim();
+    if (!text) { setParseError('Paste property data above.'); return; }
+
+    let properties = [];
+
+    // Try JSON first
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        properties = parsed;
+      } else if (parsed.properties) {
+        properties = parsed.properties;
+        if (parsed.title && !title) setTitle(parsed.title);
+      }
+    } catch {
+      // Parse pipe-delimited lines
+      const lines = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('Property Name'));
+      for (const line of lines) {
+        const parts = line.split('|').map(s => s.trim());
+        if (parts.length >= 2) {
+          properties.push({
+            name: parts[0] || '',
+            address: parts[1] || '',
+            sf: parts[2] || '',
+            askingRent: parts[3] || '',
+            notes: parts[4] || '',
+          });
+        }
+      }
+    }
+
+    if (properties.length === 0) {
+      setParseError('Could not parse any properties. Use pipe-delimited lines or JSON.');
+      return;
+    }
+
+    // Auto-rank: first 4 are recommended
+    properties = properties.map((p, i) => ({
+      ...p,
+      rank: p.rank || i + 1,
+      recommended: p.recommended ?? (i < 4),
+    }));
+
+    onSubmit({ title: title || 'Market Survey', properties });
+  };
+
+  return (
+    <div className="survey-form-container">
+      <div className="survey-form">
+        <h1 className="survey-form-title">Market Survey Map</h1>
+        <p className="survey-form-desc">Plot candidate properties on a map with optional retailer overlay.</p>
+
+        <label className="survey-form-label">Survey Title</label>
+        <input
+          type="text"
+          className="survey-form-input"
+          placeholder="e.g. Office Search — Harvie LLC"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+        />
+
+        <label className="survey-form-label">Properties</label>
+        <textarea
+          className="survey-form-textarea"
+          rows={12}
+          placeholder={placeholder}
+          value={textInput}
+          onChange={e => setTextInput(e.target.value)}
+        />
+
+        {parseError && <p className="survey-form-error">{parseError}</p>}
+
+        <button className="survey-form-btn" onClick={handleSubmit}>
+          Generate Survey Map
+        </button>
+
+        <p className="survey-form-hint">
+          First 4 properties are marked as recommended (green star). Others get numbered pins.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ───────────────────────────────────────────────────
 export default function SurveyMap() {
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
@@ -131,9 +233,10 @@ export default function SurveyMap() {
   // Core state
   const [surveyTitle, setSurveyTitle] = useState('Market Survey');
   const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingStatus, setLoadingStatus] = useState('Loading survey data\u2026');
+  const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
   const [error, setError] = useState('');
+  const [showForm, setShowForm] = useState(false);
   const [activePropertyIdx, setActivePropertyIdx] = useState(null);
   const [flyTo, setFlyTo] = useState(null);
   const [fitBounds, setFitBounds] = useState(null);
@@ -154,59 +257,53 @@ export default function SurveyMap() {
   const mapPanelRef = useRef(null);
   const cardRefs = useRef({});
 
-  // ── Load survey data on mount ────────────────────────────────────
-  useEffect(() => {
-    async function loadSurvey() {
-      const data = decodeHashData();
-      if (!data || !data.properties?.length) {
-        setError('No survey data found. Pass property data via URL hash (#data=base64json).');
-        setLoading(false);
-        return;
-      }
+  // ── Handle form submission ─────────────────────────────────────────
+  const handleFormSubmit = useCallback(async (data) => {
+    setShowForm(false);
+    setLoading(true);
+    setLoadingStatus(`Geocoding ${data.properties.length} properties\u2026`);
+    setSurveyTitle(data.title);
 
-      setSurveyTitle(data.title || 'Market Survey');
-      setLoadingStatus(`Geocoding ${data.properties.length} properties\u2026`);
+    try {
+      const addresses = data.properties.map(p => p.address);
+      const geoRes = await fetch('/api/geocode-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses }),
+      });
 
-      try {
-        // Geocode all property addresses
-        const addresses = data.properties.map(p => p.address);
-        const geoRes = await fetch('/api/geocode-batch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ addresses }),
-        });
+      if (!geoRes.ok) throw new Error('Geocoding failed');
+      const geoResults = await geoRes.json();
 
-        if (!geoRes.ok) throw new Error('Geocoding failed');
-        const geoResults = await geoRes.json();
+      const enriched = data.properties.map((p, i) => ({
+        ...p,
+        lat: geoResults[i]?.lat || null,
+        lng: geoResults[i]?.lng || null,
+        geocoded: !!(geoResults[i]?.lat),
+      }));
 
-        // Merge lat/lng into properties
-        const enriched = data.properties.map((p, i) => ({
-          ...p,
-          lat: geoResults[i]?.lat || null,
-          lng: geoResults[i]?.lng || null,
-          geocoded: !!(geoResults[i]?.lat),
-        }));
+      const valid = enriched.filter(p => p.geocoded);
+      if (valid.length === 0) throw new Error('Could not geocode any property addresses.');
 
-        // Filter to only geocoded properties
-        const valid = enriched.filter(p => p.geocoded);
-        if (valid.length === 0) {
-          throw new Error('Could not geocode any property addresses.');
-        }
-
-        setProperties(enriched);
-
-        // Fit map to all valid properties
-        const pts = valid.map(p => [p.lat, p.lng]);
-        setFitBounds(pts);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
+      setProperties(enriched);
+      setFitBounds(valid.map(p => [p.lat, p.lng]));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-
-    loadSurvey();
   }, []);
+
+  // ── Load survey data on mount (from hash if present) ───────────────
+  useEffect(() => {
+    const data = decodeHashData();
+    if (!data || !data.properties?.length) {
+      setShowForm(true);
+      return;
+    }
+    // Hash data found — load it via the same path as form submission
+    handleFormSubmit(data);
+  }, [handleFormSubmit]);
 
   // ── Load retailers when toggled on ───────────────────────────────
   useEffect(() => {
@@ -396,6 +493,10 @@ export default function SurveyMap() {
   );
 
   // ── Render ───────────────────────────────────────────────────────
+  if (showForm) {
+    return <SurveyForm onSubmit={handleFormSubmit} />;
+  }
+
   if (loading) {
     return (
       <div className="survey-loading">

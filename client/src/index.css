@@ -1024,3 +1024,389 @@ body {
     top: 64px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   SURVEY MAP MODE
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Loading / Error ──────────────────────────────────────────────── */
+.survey-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  gap: 16px;
+}
+
+.survey-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.survey-error {
+  color: #f44336;
+  text-align: center;
+  max-width: 400px;
+}
+
+/* ── Sidebar header ───────────────────────────────────────────────── */
+.survey-header {
+  padding: 20px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.survey-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.survey-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.survey-warn {
+  color: #FF9800;
+}
+
+/* ── Property list ────────────────────────────────────────────────── */
+.survey-property-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.survey-property-card {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.survey-property-card:hover {
+  border-color: var(--gold);
+}
+
+.survey-property-card.active {
+  border-color: var(--gold);
+  background: rgba(201, 168, 76, 0.1);
+}
+
+.survey-property-card.failed {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Rank badge ───────────────────────────────────────────────────── */
+.survey-rank-badge {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  position: relative;
+}
+
+.survey-rank-badge.recommended {
+  background: #2E7D32;
+  color: #fff;
+}
+
+.survey-rank-badge.numbered {
+  background: #546E7A;
+  color: #fff;
+}
+
+.survey-star {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 14px;
+  color: var(--gold);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5));
+}
+
+.survey-rank-num {
+  font-size: 14px;
+}
+
+/* ── Card body ────────────────────────────────────────────────────── */
+.survey-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.survey-card-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.survey-card-address {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.survey-card-details {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.survey-detail {
+  font-size: 11px;
+  color: var(--gold);
+  background: rgba(201, 168, 76, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.survey-card-notes {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.survey-card-error {
+  font-size: 11px;
+  color: #f44336;
+  margin-top: 4px;
+}
+
+/* ── Retailer accordion ───────────────────────────────────────────── */
+.survey-retailer-section {
+  border-top: 1px solid var(--border);
+}
+
+.survey-accordion-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.survey-accordion-toggle:hover {
+  color: var(--text);
+}
+
+.accordion-arrow {
+  font-size: 10px;
+}
+
+.survey-accordion-body {
+  padding: 0 16px 12px;
+}
+
+.survey-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.survey-toggle-label input[type="checkbox"] {
+  accent-color: var(--gold);
+}
+
+.survey-toggle-text {
+  font-size: 12px;
+}
+
+.survey-retailer-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.survey-retailer-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* ── Controls & Export ────────────────────────────────────────────── */
+.survey-controls {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.survey-style-btn {
+  width: 100%;
+  padding: 6px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.survey-style-btn:hover {
+  border-color: var(--gold);
+  color: var(--text);
+}
+
+.survey-export {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px 16px;
+}
+
+/* ── Map markers ──────────────────────────────────────────────────── */
+.survey-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.survey-marker-label {
+  background: rgba(15, 25, 35, 0.88);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  text-align: center;
+  margin-bottom: 2px;
+  letter-spacing: 0.3px;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.survey-marker-pin {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.survey-star-badge {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  z-index: 10;
+}
+
+/* ── Map popup ────────────────────────────────────────────────────── */
+.survey-popup {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.survey-popup-address {
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.survey-popup-notes {
+  font-style: italic;
+  color: #888;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.survey-popup-rec {
+  color: #2E7D32;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* ── Map legend ───────────────────────────────────────────────────── */
+.survey-map-legend {
+  background: rgba(15, 25, 35, 0.92);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  max-width: 260px;
+  color: #fff;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.legend-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.legend-dot {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.legend-name {
+  font-size: 11px;
+  color: #e8e2d8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -771,7 +771,7 @@ export default function SurveyMap() {
                     {p.sf && <div>Size: {p.sf} SF</div>}
                     {(p.askingRent || p.askingPrice) && <div>Asking: {p.askingRent || p.askingPrice}</div>}
                     {p.nearestHighway && (
-                      <div style={{ marginTop: 4, fontSize: '12px', color: '#555' }}>
+                      <div style={{ marginTop: 4, fontSize: '12px', color: '#e2c47a' }}>
                         {'\u{1F6E3}\uFE0F'} {p.nearestHighway.distance_miles} mi to {p.nearestHighway.name}
                       </div>
                     )}

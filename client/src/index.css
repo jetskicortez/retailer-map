@@ -1194,8 +1194,12 @@ body {
 
 .survey-card-highway {
   font-size: 11px;
-  color: #8ab4f8;
+  color: #e2c47a;
   margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
 }
 
 .survey-card-notes {

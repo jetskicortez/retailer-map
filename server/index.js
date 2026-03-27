@@ -99,6 +99,29 @@ app.post('/api/geocode-batch', async (req, res) => {
   }
 });
 
+// ── Highway name shortener ───────────────────────────────────────
+function shortenHighwayName(name) {
+  if (!name) return 'Highway Access';
+  // Try to extract interstate/route number: "I-376", "US-19", "PA-28", "Route 22"
+  const patterns = [
+    /\b(I-\d+)\b/i,
+    /\b(US-\d+)\b/i,
+    /\b(PA-\d+)\b/i,
+    /\b(Route\s*\d+)\b/i,
+    /\b(SR\s*\d+)\b/i,
+    /\b(Interstate\s*\d+)\b/i,
+  ];
+  for (const pat of patterns) {
+    const m = name.match(pat);
+    if (m) return m[1].replace(/Interstate\s*/i, 'I-');
+  }
+  // Shorten common long names
+  if (name.length > 30) {
+    return name.split(/[,\-–—]/)[0].trim().substring(0, 28);
+  }
+  return name;
+}
+
 // ── Nearest highway on-ramp for survey properties ────────────────
 app.post('/api/nearest-highway', async (req, res) => {
   try {
@@ -128,43 +151,62 @@ app.post('/api/nearest-highway', async (req, res) => {
         if (!prop.lat || !prop.lng) return null;
 
         try {
-          // Google Places (New) Text Search for highway interchanges nearby
+          // Run multiple searches in parallel for different highway types
           const searchUrl = 'https://places.googleapis.com/v1/places:searchText';
-          const response = await fetch(searchUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Goog-Api-Key': apiKey,
-              'X-Goog-FieldMask': 'places.displayName,places.location,places.formattedAddress',
-            },
-            body: JSON.stringify({
-              textQuery: 'highway interchange OR interstate on-ramp OR turnpike entrance',
-              locationBias: {
-                circle: {
-                  center: { latitude: prop.lat, longitude: prop.lng },
-                  radius: 16093.4, // 10 miles in meters
+          const queries = [
+            'interstate highway entrance ramp',
+            'I-376 OR I-79 OR I-279 OR I-76 OR I-28 OR US-19 OR US-22 OR US-30 interchange',
+            'highway on-ramp',
+          ];
+
+          const allPlaces = [];
+          const responses = await Promise.all(
+            queries.map(textQuery =>
+              fetch(searchUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Goog-Api-Key': apiKey,
+                  'X-Goog-FieldMask': 'places.displayName,places.location,places.formattedAddress',
                 },
-              },
-              maxResultCount: 5,
-            }),
-          });
+                body: JSON.stringify({
+                  textQuery,
+                  locationBias: {
+                    circle: {
+                      center: { latitude: prop.lat, longitude: prop.lng },
+                      radius: 8047, // 5 miles in meters
+                    },
+                  },
+                  maxResultCount: 5,
+                }),
+              }).then(r => r.json()).catch(() => ({ places: [] }))
+            )
+          );
 
-          const data = await response.json();
-          const places = data.places || [];
+          for (const data of responses) {
+            if (data.places) allPlaces.push(...data.places);
+          }
 
-          if (places.length === 0) return null;
+          if (allPlaces.length === 0) return null;
 
           // Find closest result
           let closest = null;
           let minDist = Infinity;
-          for (const place of places) {
+          const seen = new Set();
+          for (const place of allPlaces) {
             const loc = place.location;
             if (!loc) continue;
+            const key = `${loc.latitude.toFixed(5)},${loc.longitude.toFixed(5)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
             const dist = haversine(prop.lat, prop.lng, loc.latitude, loc.longitude);
             if (dist < minDist) {
               minDist = dist;
+              // Shorten the display name — extract route number if present
+              let name = place.displayName?.text || 'Highway Access';
+              name = shortenHighwayName(name);
               closest = {
-                name: place.displayName?.text || 'Highway Access',
+                name,
                 address: place.formattedAddress || '',
                 lat: loc.latitude,
                 lng: loc.longitude,

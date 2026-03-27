@@ -48,6 +48,8 @@ body {
   border-right: 1px solid var(--border);
   overflow: hidden;
   transition: width 0.3s ease, min-width 0.3s ease;
+  z-index: 1000;
+  position: relative;
 }
 
 .sidebar.collapsed {

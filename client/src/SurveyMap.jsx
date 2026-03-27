@@ -11,51 +11,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { createRecommendedIcon, createNumberedIcon } from './surveyMarkers.js';
 import { getLogoUrl, preloadLogo, createLogoIcon } from './logos.js';
-
-// ── Shared constants (subset from App.jsx) ───────────────────────────
-const CATEGORIES = {
-  Grocery:          { color: '#4CAF50', emoji: '\u{1F6D2}' },
-  Pharmacy:         { color: '#f44336', emoji: '\u{1F48A}' },
-  'Fast Food':      { color: '#FF9800', emoji: '\u{1F354}' },
-  'Casual Dining':  { color: '#FFD600', emoji: '\u{1F37D}' },
-  Coffee:           { color: '#795548', emoji: '\u2615' },
-  Fitness:          { color: '#9C27B0', emoji: '\u{1F4AA}' },
-  'Home Improvement': { color: '#8D6E63', emoji: '\u{1F528}' },
-  Banking:          { color: '#2196F3', emoji: '\u{1F3E6}' },
-  Auto:             { color: '#607D8B', emoji: '\u{1F697}' },
-  Entertainment:    { color: '#E91E63', emoji: '\u{1F3AC}' },
-  'Department Store': { color: '#00BCD4', emoji: '\u{1F6CD}' },
-  'Discount/Value': { color: '#FF5722', emoji: '\u{1F3F7}' },
-  Pet:              { color: '#4DB6AC', emoji: '\u{1F43E}' },
-  'Cellular/Tech':  { color: '#5C6BC0', emoji: '\u{1F4F1}' },
-  Convenience:      { color: '#FFA726', emoji: '\u26FD' },
-  Other:            { color: '#78909C', emoji: '\u{1F4CD}' },
-};
-
-function getCategoryConfig(category) {
-  if (CATEGORIES[category]) return CATEGORIES[category];
-  for (const key of Object.keys(CATEGORIES)) {
-    if (category?.toLowerCase().includes(key.toLowerCase())) return CATEGORIES[key];
-  }
-  return CATEGORIES.Other;
-}
-
-function createRetailerIcon(category) {
-  const cfg = getCategoryConfig(category);
-  const svg = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
-    <path d="M14 35C14 35 27 22 27 13C27 6 21 1 14 1C7 1 1 6 1 13C1 22 14 35 14 35Z"
-          fill="${cfg.color}" stroke="#ffffff" stroke-width="1.5"/>
-    <circle cx="14" cy="13" r="9" fill="#ffffff" opacity="0.5"/>
-    <text x="14" y="17" text-anchor="middle" font-size="12">${cfg.emoji}</text>
-  </svg>`;
-  return L.divIcon({
-    html: svg,
-    className: '',
-    iconSize: [28, 36],
-    iconAnchor: [14, 36],
-    popupAnchor: [0, -36],
-  });
-}
+import { getCategoryConfig, createRetailerIcon, SmartClusterLayer } from './clustering.js';
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 3958.8;
@@ -257,6 +213,8 @@ export default function SurveyMap() {
   const mapRef = useRef(null);
   const mapPanelRef = useRef(null);
   const cardRefs = useRef({});
+  const connectorDataRef = useRef([]);
+  const isExportingRef = useRef(false);
 
   // ── Handle form submission ─────────────────────────────────────────
   const handleFormSubmit = useCallback(async (data) => {
@@ -752,21 +710,29 @@ export default function SurveyMap() {
             );
           })}
 
-          {/* Retailer markers */}
-          {filteredRetailers.map((r, i) => (
-            <Marker
-              key={`ret-${r.placeId || i}`}
-              position={[r.lat, r.lng]}
-              icon={getLogoUrl(r.name) ? createLogoIcon(getLogoUrl(r.name), r.name) : createRetailerIcon(r.category)}
-            >
-              <Popup>
-                <strong>{r.name}</strong>
-                <div>{r.category}</div>
-                <div style={{ fontSize: '0.85em', color: '#666' }}>{r.address}</div>
-                {r.rating && <div>Rating: {r.rating} ({r.userRatingCount} reviews)</div>}
-              </Popup>
-            </Marker>
-          ))}
+          {/* Retailer markers (smart clusters + collision avoidance) */}
+          <SmartClusterLayer
+            propertyLatLng={center}
+            connectorDataRef={connectorDataRef}
+            isExportingRef={isExportingRef}
+            radiusMiles={2}
+          >
+            {filteredRetailers.map((r, i) => {
+              const cfg = getCategoryConfig(r.category);
+              const logoUrl = getLogoUrl(r.name);
+              return {
+                position: [r.lat, r.lng],
+                icon: logoUrl ? createLogoIcon(logoUrl, r.name) : createRetailerIcon(r.category),
+                idx: i,
+                name: r.name,
+                category: r.category,
+                logoUrl: logoUrl || null,
+                popup: `<div class="popup-name">${r.name}</div>
+                  <div class="popup-category" style="color:${cfg.color}">${cfg.emoji} ${r.category}</div>
+                  <div class="popup-address">${r.address}</div>`,
+              };
+            })}
+          </SmartClusterLayer>
 
           {/* Survey legend overlay on map */}
           <SurveyLegend title={surveyTitle} properties={properties} />

@@ -1192,6 +1192,12 @@ body {
   border-radius: 4px;
 }
 
+.survey-card-highway {
+  font-size: 11px;
+  color: #8ab4f8;
+  margin-top: 3px;
+}
+
 .survey-card-notes {
   font-size: 11px;
   color: var(--text-muted);
@@ -1290,12 +1296,6 @@ body {
 .survey-style-btn:hover {
   border-color: var(--gold);
   color: var(--text);
-}
-
-.survey-export {
-  display: flex;
-  gap: 6px;
-  padding: 8px 16px 16px;
 }
 
 /* ── Map markers ──────────────────────────────────────────────────── */

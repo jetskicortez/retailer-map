@@ -99,6 +99,94 @@ app.post('/api/geocode-batch', async (req, res) => {
   }
 });
 
+// ── Nearest highway on-ramp for survey properties ────────────────
+app.post('/api/nearest-highway', async (req, res) => {
+  try {
+    const { properties } = req.body; // [{ lat, lng, name }]
+    if (!Array.isArray(properties)) {
+      return res.status(400).json({ error: 'properties array required' });
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey || apiKey === 'YOUR_KEY_HERE') {
+      return res.json(properties.map(() => null));
+    }
+
+    // Haversine distance in miles
+    function haversine(lat1, lng1, lat2, lng2) {
+      const R = 3958.8;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLng = ((lng2 - lng1) * Math.PI) / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    const results = await Promise.all(
+      properties.map(async (prop) => {
+        if (!prop.lat || !prop.lng) return null;
+
+        try {
+          // Google Places (New) Text Search for highway interchanges nearby
+          const searchUrl = 'https://places.googleapis.com/v1/places:searchText';
+          const response = await fetch(searchUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': apiKey,
+              'X-Goog-FieldMask': 'places.displayName,places.location,places.formattedAddress',
+            },
+            body: JSON.stringify({
+              textQuery: 'highway interchange OR interstate on-ramp OR turnpike entrance',
+              locationBias: {
+                circle: {
+                  center: { latitude: prop.lat, longitude: prop.lng },
+                  radius: 16093.4, // 10 miles in meters
+                },
+              },
+              maxResultCount: 5,
+            }),
+          });
+
+          const data = await response.json();
+          const places = data.places || [];
+
+          if (places.length === 0) return null;
+
+          // Find closest result
+          let closest = null;
+          let minDist = Infinity;
+          for (const place of places) {
+            const loc = place.location;
+            if (!loc) continue;
+            const dist = haversine(prop.lat, prop.lng, loc.latitude, loc.longitude);
+            if (dist < minDist) {
+              minDist = dist;
+              closest = {
+                name: place.displayName?.text || 'Highway Access',
+                address: place.formattedAddress || '',
+                lat: loc.latitude,
+                lng: loc.longitude,
+                distance_miles: Math.round(dist * 10) / 10,
+              };
+            }
+          }
+
+          return closest;
+        } catch (err) {
+          console.error(`Highway search failed for ${prop.name}:`, err.message);
+          return null;
+        }
+      })
+    );
+
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── National brand list for chain classification ─────────────────
 const NATIONAL_BRANDS = new Set([
   // Grocery

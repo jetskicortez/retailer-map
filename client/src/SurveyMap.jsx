@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { createRecommendedIcon, createNumberedIcon } from './surveyMarkers.js';
+import { getLogoUrl, preloadLogo, createLogoIcon } from './logos.js';
 
 // ── Shared constants (subset from App.jsx) ───────────────────────────
 const CATEGORIES = {
@@ -285,6 +286,30 @@ export default function SurveyMap() {
       const valid = enriched.filter(p => p.geocoded);
       if (valid.length === 0) throw new Error('Could not geocode any property addresses.');
 
+      // Fetch nearest highway on-ramp for each property
+      setLoadingStatus('Finding nearest highway access\u2026');
+      try {
+        const hwRes = await fetch('/api/nearest-highway', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            properties: valid.map(p => ({ lat: p.lat, lng: p.lng, name: p.name })),
+          }),
+        });
+        if (hwRes.ok) {
+          const hwResults = await hwRes.json();
+          let hwIdx = 0;
+          for (let i = 0; i < enriched.length; i++) {
+            if (enriched[i].geocoded) {
+              enriched[i].nearestHighway = hwResults[hwIdx] || null;
+              hwIdx++;
+            }
+          }
+        }
+      } catch {
+        // Highway data is non-critical — continue without it
+      }
+
       setProperties(enriched);
       setFitBounds(valid.map(p => [p.lat, p.lng]));
     } catch (err) {
@@ -344,6 +369,10 @@ export default function SurveyMap() {
         if (!res.ok) throw new Error('Retailer search failed');
         const data = await res.json();
         setRetailers(data.retailers || []);
+
+        // Preload retailer logos
+        const logoUrls = (data.retailers || []).map(r => getLogoUrl(r.name)).filter(Boolean);
+        await Promise.all(logoUrls.map(preloadLogo));
       } catch (err) {
         console.error('Retailer fetch error:', err);
       } finally {
@@ -571,6 +600,11 @@ export default function SurveyMap() {
                           <span className="survey-detail">{p.askingRent || p.askingPrice}</span>
                         )}
                       </div>
+                      {p.nearestHighway && (
+                        <div className="survey-card-highway">
+                          {'\u{1F6E3}\uFE0F'} {p.nearestHighway.distance_miles} mi to {p.nearestHighway.name}
+                        </div>
+                      )}
                       {p.notes && <div className="survey-card-notes">{p.notes}</div>}
                       {!p.geocoded && <div className="survey-card-error">Could not locate address</div>}
                     </div>
@@ -659,10 +693,12 @@ export default function SurveyMap() {
             </div>
 
             {/* Export buttons */}
-            <div className="survey-export">
-              <button onClick={handleExportPNG} className="export-btn">PNG</button>
-              <button onClick={handleExportPDF} className="export-btn">PDF</button>
-              <button onClick={handleExportCSV} className="export-btn">CSV</button>
+            <div className="export-section">
+              <div className="export-buttons">
+                <button onClick={handleExportPNG} className="btn-export primary">Export PNG</button>
+                <button onClick={handleExportPDF} className="btn-export">Export PDF</button>
+                <button onClick={handleExportCSV} className="btn-export">Export CSV</button>
+              </div>
             </div>
           </>
         )}
@@ -703,6 +739,11 @@ export default function SurveyMap() {
                     <div className="survey-popup-address">{p.address}</div>
                     {p.sf && <div>Size: {p.sf} SF</div>}
                     {(p.askingRent || p.askingPrice) && <div>Asking: {p.askingRent || p.askingPrice}</div>}
+                    {p.nearestHighway && (
+                      <div style={{ marginTop: 4, fontSize: '12px', color: '#555' }}>
+                        {'\u{1F6E3}\uFE0F'} {p.nearestHighway.distance_miles} mi to {p.nearestHighway.name}
+                      </div>
+                    )}
                     {p.notes && <div className="survey-popup-notes">{p.notes}</div>}
                     {p.recommended && <div className="survey-popup-rec">\u2605 Recommended</div>}
                   </div>
@@ -716,7 +757,7 @@ export default function SurveyMap() {
             <Marker
               key={`ret-${r.placeId || i}`}
               position={[r.lat, r.lng]}
-              icon={createRetailerIcon(r.category)}
+              icon={getLogoUrl(r.name) ? createLogoIcon(getLogoUrl(r.name), r.name) : createRetailerIcon(r.category)}
             >
               <Popup>
                 <strong>{r.name}</strong>

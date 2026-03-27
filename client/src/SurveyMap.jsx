@@ -387,17 +387,97 @@ export default function SurveyMap() {
   }, []);
 
   // ── Export functions ─────────────────────────────────────────────
-  const handleExportPNG = useCallback(async () => {
-    if (!mapPanelRef.current) return;
-    try {
-      const canvas = await html2canvas(mapPanelRef.current, {
-        useCORS: true,
-        allowTaint: true,
-        scale: 2,
-        backgroundColor: '#0f1923',
-        width: mapPanelRef.current.offsetWidth,
-        height: mapPanelRef.current.offsetHeight,
+  const captureMapWithConnectors = useCallback(async () => {
+    if (!mapPanelRef.current) return null;
+    const map = mapRef.current;
+
+    isExportingRef.current = true;
+
+    // Capture the base map
+    const rawCanvas = await html2canvas(mapPanelRef.current, {
+      useCORS: true,
+      allowTaint: true,
+      scale: 2,
+      backgroundColor: '#f2efe9',
+      width: mapPanelRef.current.offsetWidth,
+      height: mapPanelRef.current.offsetHeight,
+    });
+
+    // Draw connector lines onto the canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = rawCanvas.width;
+    canvas.height = rawCanvas.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(rawCanvas, 0, 0);
+
+    if (map && connectorDataRef.current && connectorDataRef.current.length > 0) {
+      const scaleX = rawCanvas.width / mapPanelRef.current.offsetWidth;
+      const scaleY = rawCanvas.height / mapPanelRef.current.offsetHeight;
+
+      const connectors = connectorDataRef.current.map((c) => {
+        const fromPt = map.latLngToContainerPoint(c.from);
+        const toPt = map.latLngToContainerPoint(c.to);
+        const dist = Math.hypot(fromPt.x - toPt.x, fromPt.y - toPt.y);
+        return {
+          fromX: fromPt.x, fromY: fromPt.y + (c.iconH || 46) / 2,
+          toX: toPt.x, toY: toPt.y,
+          markerCx: fromPt.x, markerCy: fromPt.y,
+          markerW: (c.padW || (c.iconW || 46) + 14),
+          markerH: (c.padH || (c.iconH || 46) + 14),
+          dist,
+        };
+      }).filter((c) => c.dist > 5);
+
+      // Draw lines
+      connectors.forEach(({ fromX, fromY, toX, toY }) => {
+        const x1 = fromX * scaleX, y1 = fromY * scaleY;
+        const x2 = toX * scaleX, y2 = toY * scaleY;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 8 * scaleX;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4 * scaleX;
+        ctx.stroke();
+
+        // White dot at actual location
+        ctx.beginPath();
+        ctx.arc(x2, y2, 7 * scaleX, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x2, y2, 5 * scaleX, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
       });
+
+      // Re-stamp marker regions from rawCanvas so logos sit on top of lines
+      connectors.forEach(({ markerCx, markerCy, markerW, markerH }) => {
+        const boxX = (markerCx - markerW / 2 + 3) * scaleX;
+        const boxY = (markerCy - markerH / 2 + 3) * scaleY;
+        const boxW = (markerW - 6) * scaleX;
+        const boxH = (markerH - 6) * scaleY;
+        if (boxX >= 0 && boxY >= 0 && boxW > 0 && boxH > 0 &&
+            boxX + boxW <= rawCanvas.width && boxY + boxH <= rawCanvas.height) {
+          ctx.drawImage(rawCanvas, boxX, boxY, boxW, boxH, boxX, boxY, boxW, boxH);
+        }
+      });
+    }
+
+    isExportingRef.current = false;
+    return canvas;
+  }, [surveyTitle]);
+
+  const handleExportPNG = useCallback(async () => {
+    try {
+      const canvas = await captureMapWithConnectors();
+      if (!canvas) return;
 
       const slug = surveyTitle.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 40) || 'survey_map';
       const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
@@ -413,19 +493,12 @@ export default function SurveyMap() {
     } catch (err) {
       console.error('Export error:', err);
     }
-  }, [surveyTitle]);
+  }, [surveyTitle, captureMapWithConnectors]);
 
   const handleExportPDF = useCallback(async () => {
-    if (!mapPanelRef.current) return;
     try {
-      const canvas = await html2canvas(mapPanelRef.current, {
-        useCORS: true,
-        allowTaint: true,
-        scale: 2,
-        backgroundColor: '#0f1923',
-        width: mapPanelRef.current.offsetWidth,
-        height: mapPanelRef.current.offsetHeight,
-      });
+      const canvas = await captureMapWithConnectors();
+      if (!canvas) return;
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
@@ -438,7 +511,7 @@ export default function SurveyMap() {
     } catch (err) {
       console.error('PDF export error:', err);
     }
-  }, [surveyTitle]);
+  }, [surveyTitle, captureMapWithConnectors]);
 
   const handleExportCSV = useCallback(() => {
     const lines = ['Rank,Name,Address,SF,Asking Rent/Price,Recommended,Lat,Lng'];
@@ -546,7 +619,7 @@ export default function SurveyMap() {
                     onClick={() => p.geocoded && handlePropertyClick(i)}
                   >
                     <div className={`survey-rank-badge ${isRec ? 'recommended' : 'numbered'}`}>
-                      {isRec && <span className="survey-star">\u2605</span>}
+                      {isRec && <span className="survey-star">{'★'}</span>}
                       <span className="survey-rank-num">{p.rank || i + 1}</span>
                     </div>
                     <div className="survey-card-body">
@@ -703,7 +776,7 @@ export default function SurveyMap() {
                       </div>
                     )}
                     {p.notes && <div className="survey-popup-notes">{p.notes}</div>}
-                    {p.recommended && <div className="survey-popup-rec">\u2605 Recommended</div>}
+                    {p.recommended && <div className="survey-popup-rec">{'★'} Recommended</div>}
                   </div>
                 </Popup>
               </Marker>
@@ -759,7 +832,7 @@ function SurveyLegend({ title, properties }) {
         .map((p, i) => {
           const isRec = p.recommended && p.rank <= 4;
           const dot = isRec ? '#2E7D32' : '#546E7A';
-          const star = isRec ? '\u2605 ' : '';
+          const star = isRec ? '★ ' : '';
           const num = p.rank || i + 1;
           const name = p.name || p.address?.split(',')[0] || `Property ${num}`;
           return `<div class="legend-item">

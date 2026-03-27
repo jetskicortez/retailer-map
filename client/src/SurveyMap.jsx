@@ -84,7 +84,7 @@ function MapController({ flyTo, fitBounds }) {
   return null;
 }
 
-function TileLayer({ style }) {
+function SurveyTileLayer({ style }) {
   const map = useMap();
   const layerRef = useRef(null);
 
@@ -522,30 +522,30 @@ export default function SurveyMap() {
     : [40.44, -79.99]; // Pittsburgh default
 
   return (
-    <div className="app-container">
+    <div className="app">
       {/* ── Sidebar ──────────────────────────────────────────────── */}
-      <div className={`sidebar ${sidebarOpen ? '' : 'collapsed'}`}>
-        <button
-          className="sidebar-toggle"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-        >
-          {sidebarOpen ? '\u276E' : '\u276F'}
-        </button>
+      <aside className={`sidebar${sidebarOpen ? ' open' : ' collapsed'}`}>
+        <div className="sidebar-header">
+          <div>
+            <h2 className="survey-title">{surveyTitle}</h2>
+            <p className="survey-subtitle">
+              {validProperties.length} propert{validProperties.length === 1 ? 'y' : 'ies'}
+              {properties.length !== validProperties.length && (
+                <span className="survey-warn"> ({properties.length - validProperties.length} could not be geocoded)</span>
+              )}
+            </p>
+          </div>
+          <button
+            className="sidebar-toggle-btn"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            {sidebarOpen ? '\u276E' : '\u276F'}
+          </button>
+        </div>
 
         {sidebarOpen && (
           <>
-            {/* Header */}
-            <div className="survey-header">
-              <h2 className="survey-title">{surveyTitle}</h2>
-              <p className="survey-subtitle">
-                {validProperties.length} propert{validProperties.length === 1 ? 'y' : 'ies'}
-                {properties.length !== validProperties.length && (
-                  <span className="survey-warn"> ({properties.length - validProperties.length} could not be geocoded)</span>
-                )}
-              </p>
-            </div>
-
             {/* Property list */}
             <div className="survey-property-list">
               {properties.map((p, i) => {
@@ -666,10 +666,10 @@ export default function SurveyMap() {
             </div>
           </>
         )}
-      </div>
+      </aside>
 
       {/* ── Map ──────────────────────────────────────────────────── */}
-      <div className="map-panel" ref={mapPanelRef}>
+      <div className={`map-panel${mapStyle === 'satellite' ? ' satellite' : ''}`} ref={mapPanelRef}>
         <MapContainer
           center={center}
           zoom={12}
@@ -677,7 +677,7 @@ export default function SurveyMap() {
           ref={mapRef}
           zoomControl={true}
         >
-          <TileLayer style={mapStyle} />
+          <SurveyTileLayer style={mapStyle} />
           <MapController flyTo={flyTo} fitBounds={fitBounds} />
 
           {/* Property markers */}

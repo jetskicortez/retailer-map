@@ -53,8 +53,8 @@ body {
 }
 
 .sidebar.collapsed {
-  width: 48px;
-  min-width: 48px;
+  width: 52px;
+  min-width: 52px;
 }
 
 .sidebar.collapsed > *:not(.sidebar-header) {
@@ -62,6 +62,11 @@ body {
 }
 
 .sidebar.collapsed .brand-text {
+  display: none;
+}
+
+/* Hide the title div when collapsed so only the button shows */
+.sidebar.collapsed .sidebar-header > div:first-child {
   display: none;
 }
 
@@ -75,9 +80,11 @@ body {
 }
 
 .sidebar.collapsed .sidebar-header {
-  padding: 12px 8px;
+  padding: 10px 7px;
   justify-content: center;
+  align-items: center;
   border-bottom: none;
+  height: 58px;
 }
 
 .sidebar-toggle-btn {

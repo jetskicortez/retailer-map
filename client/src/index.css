@@ -1280,14 +1280,25 @@ body {
 }
 
 .survey-property-card.hidden-prop {
-  opacity: 0.4;
+  opacity: 0.35;
+  border-left: 2px solid transparent;
 }
 
-.survey-property-card.hidden-prop .survey-card-name,
-.survey-property-card.hidden-prop .survey-card-address,
-.survey-property-card.hidden-prop .survey-card-details {
-  text-decoration: line-through;
-  text-decoration-color: rgba(255, 255, 255, 0.2);
+.survey-property-card.hidden-prop:hover {
+  opacity: 0.6;
+}
+
+.survey-share-section {
+  padding: 0 16px 12px;
+}
+
+.survey-share-url {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  word-break: break-all;
+  font-family: 'DM Mono', monospace;
+  opacity: 0.6;
 }
 
 /* ── Retailer accordion ───────────────────────────────────────────── */

@@ -241,6 +241,8 @@ export default function SurveyMap() {
   const [hiddenProperties, setHiddenProperties] = useState(new Set());
   const [isochroneGeoJSON, setIsochroneGeoJSON] = useState(null);
   const [isochroneLoading, setIsochroneLoading] = useState(false);
+  const [shortUrl, setShortUrl] = useState('');
+  const [copyFeedback, setCopyFeedback] = useState('');
 
   const mapRef = useRef(null);
   const mapPanelRef = useRef(null);
@@ -311,6 +313,20 @@ export default function SurveyMap() {
       };
       const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(sharePayload));
       window.history.replaceState(null, '', `${window.location.pathname}?mode=survey#s=${compressed}`);
+
+      // Generate short URL
+      const fullUrl = window.location.href;
+      try {
+        const shortRes = await fetch('/api/shorten-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: fullUrl }),
+        });
+        const shortData = await shortRes.json();
+        if (shortData.shortUrl) setShortUrl(shortData.shortUrl);
+      } catch {
+        setShortUrl(fullUrl);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -576,9 +592,50 @@ export default function SurveyMap() {
       });
     }
 
+    // Draw isochrone polygon if active
+    if (map && isochroneGeoJSON && isochroneGeoJSON.features) {
+      const scaleX = rawCanvas.width / mapPanelRef.current.offsetWidth;
+      const scaleY = rawCanvas.height / mapPanelRef.current.offsetHeight;
+
+      for (const feature of isochroneGeoJSON.features) {
+        const geom = feature.geometry;
+        if (!geom || !geom.coordinates) continue;
+
+        // Handle both Polygon and MultiPolygon
+        const rings = geom.type === 'MultiPolygon'
+          ? geom.coordinates.flat()
+          : geom.coordinates;
+
+        for (const ring of rings) {
+          if (!ring || ring.length < 3) continue;
+
+          ctx.beginPath();
+          ring.forEach(([lng, lat], j) => {
+            const pt = map.latLngToContainerPoint([lat, lng]);
+            const x = pt.x * scaleX;
+            const y = pt.y * scaleY;
+            if (j === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.closePath();
+
+          // Fill
+          ctx.fillStyle = 'rgba(201, 168, 76, 0.12)';
+          ctx.fill();
+
+          // Stroke
+          ctx.strokeStyle = 'rgba(201, 168, 76, 0.8)';
+          ctx.lineWidth = 2 * scaleX;
+          ctx.setLineDash([6 * scaleX, 3 * scaleX]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+    }
+
     isExportingRef.current = false;
     return canvas;
-  }, [surveyTitle]);
+  }, [surveyTitle, isochroneGeoJSON]);
 
   const handleExportPNG = useCallback(async () => {
     try {
@@ -735,7 +792,14 @@ export default function SurveyMap() {
                     key={i}
                     ref={el => cardRefs.current[i] = el}
                     className={`survey-property-card ${isActive ? 'active' : ''} ${!p.geocoded ? 'failed' : ''} ${isHidden ? 'hidden-prop' : ''}`}
-                    onClick={() => p.geocoded && !isHidden && handlePropertyClick(i)}
+                    onClick={() => {
+                      if (!p.geocoded) return;
+                      if (isHidden) {
+                        togglePropertyVisibility(i); // re-show it
+                      } else {
+                        handlePropertyClick(i); // select it
+                      }
+                    }}
                   >
                     <div className={`survey-rank-badge ${isRec ? 'recommended' : 'numbered'}`}>
                       {isRec && <span className="survey-star">{'★'}</span>}
@@ -880,6 +944,25 @@ export default function SurveyMap() {
                 <button onClick={handleExportCSV} className="btn-export">Export CSV</button>
               </div>
             </div>
+
+            {/* Share link */}
+            {shortUrl && (
+              <div className="survey-share-section">
+                <button
+                  className="btn-export primary"
+                  onClick={() => {
+                    navigator.clipboard.writeText(shortUrl).then(() => {
+                      setCopyFeedback('Copied!');
+                      setTimeout(() => setCopyFeedback(''), 2000);
+                    });
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  {copyFeedback || '🔗 Copy Share Link'}
+                </button>
+                <p className="survey-share-url">{shortUrl}</p>
+              </div>
+            )}
           </>
         )}
       </aside>

@@ -132,6 +132,22 @@ app.post('/api/isochrone', async (req, res) => {
   }
 });
 
+// ── URL shortener proxy ──────────────────────────────────────────
+app.post('/api/shorten-url', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'url required' });
+
+    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+    if (!response.ok) throw new Error('TinyURL API error');
+    const shortUrl = await response.text();
+    res.json({ shortUrl });
+  } catch (err) {
+    // Fallback: return the original URL
+    res.json({ shortUrl: req.body.url, error: err.message });
+  }
+});
+
 // ── Known highway interchange locations (Pittsburgh metro area) ───
 // Each entry: [lat, lng, highway name, interchange description]
 // Source: PennDOT / Google Maps verified coordinates

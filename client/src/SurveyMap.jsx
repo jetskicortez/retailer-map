@@ -249,6 +249,7 @@ export default function SurveyMap() {
   const cardRefs = useRef({});
   const connectorDataRef = useRef([]);
   const isExportingRef = useRef(false);
+  const isochroneLayerRef = useRef(null);
   const isochroneCache = useRef({}); // cache: `${lat},${lng},${minutes}` → geojson
 
   // ── Handle form submission ─────────────────────────────────────────
@@ -515,6 +516,18 @@ export default function SurveyMap() {
 
     isExportingRef.current = true;
 
+    // Hide the Leaflet isochrone SVG layer before capture
+    // (we'll redraw it manually on canvas with correct coordinates)
+    const isoLayer = isochroneLayerRef.current;
+    if (isoLayer) {
+      isoLayer.eachLayer(l => {
+        if (l.getElement) {
+          const el = l.getElement();
+          if (el) el.style.display = 'none';
+        }
+      });
+    }
+
     // Capture the base map
     const rawCanvas = await html2canvas(mapPanelRef.current, {
       useCORS: true,
@@ -631,6 +644,16 @@ export default function SurveyMap() {
           ctx.setLineDash([]);
         }
       }
+    }
+
+    // Restore the Leaflet isochrone SVG layer
+    if (isoLayer) {
+      isoLayer.eachLayer(l => {
+        if (l.getElement) {
+          const el = l.getElement();
+          if (el) el.style.display = '';
+        }
+      });
     }
 
     isExportingRef.current = false;
@@ -980,7 +1003,7 @@ export default function SurveyMap() {
           <MapController flyTo={flyTo} fitBounds={fitBounds} />
 
           {/* Isochrone polygon */}
-          {isochroneGeoJSON && <IsochroneLayer geojson={isochroneGeoJSON} />}
+          {isochroneGeoJSON && <IsochroneLayer geojson={isochroneGeoJSON} layerRefOut={isochroneLayerRef} />}
 
           {/* Property markers — only visible ones */}
           {visibleProperties.map((p, i) => {
@@ -1051,7 +1074,7 @@ export default function SurveyMap() {
 }
 
 // ── Isochrone polygon layer ──────────────────────────────────────────
-function IsochroneLayer({ geojson }) {
+function IsochroneLayer({ geojson, layerRefOut }) {
   const map = useMap();
   const layerRef = useRef(null);
 
@@ -1074,13 +1097,17 @@ function IsochroneLayer({ geojson }) {
       },
     }).addTo(map);
 
+    // Expose ref so export can hide/show the layer
+    if (layerRefOut) layerRefOut.current = layerRef.current;
+
     return () => {
       if (layerRef.current) {
         map.removeLayer(layerRef.current);
         layerRef.current = null;
       }
+      if (layerRefOut) layerRefOut.current = null;
     };
-  }, [geojson, map]);
+  }, [geojson, map, layerRefOut]);
 
   return null;
 }

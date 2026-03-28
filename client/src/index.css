@@ -1264,36 +1264,39 @@ body {
 /* ── Eye toggle + hidden state ────────────────────────────────────── */
 .survey-eye-btn {
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 14px;
-  line-height: 24px;
+  font-size: 16px;
+  line-height: 28px;
   text-align: center;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: all 0.15s;
   align-self: center;
+  padding: 0;
 }
 
 .survey-eye-btn.on {
-  color: var(--gold);
-  opacity: 0.7;
+  opacity: 0.8;
+  filter: grayscale(0);
 }
 
 .survey-eye-btn.on:hover {
   opacity: 1;
-  background: rgba(201, 168, 76, 0.1);
+  background: rgba(201, 168, 76, 0.15);
+  transform: scale(1.1);
 }
 
 .survey-eye-btn.off {
-  color: var(--text-muted);
-  opacity: 0.4;
+  opacity: 0.3;
+  filter: grayscale(1);
 }
 
 .survey-eye-btn.off:hover {
-  opacity: 0.8;
+  opacity: 0.6;
+  filter: grayscale(0.5);
   background: rgba(255, 255, 255, 0.05);
 }
 

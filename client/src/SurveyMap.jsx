@@ -850,7 +850,7 @@ export default function SurveyMap() {
                       onClick={(e) => { e.stopPropagation(); togglePropertyVisibility(i); }}
                       title={isHidden ? 'Show on map' : 'Hide from map'}
                     >
-                      {isHidden ? '\u25CB' : '\u25CF'}
+                      {isHidden ? '👁‍🗨' : '👁'}
                     </button>
                   </div>
                 );

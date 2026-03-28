@@ -633,7 +633,7 @@ export default function SurveyMap() {
                       </div>
                       {p.nearestHighway && (
                         <div className="survey-card-highway">
-                          {'\u{1F6E3}\uFE0F'} {p.nearestHighway.distance_miles} mi to {p.nearestHighway.name}
+                          {'\u{1F6E3}\uFE0F'} {p.nearestHighway.distance_miles} mi to {p.nearestHighway.name}{p.nearestHighway.description ? ` (${p.nearestHighway.description})` : ''}
                         </div>
                       )}
                       {p.notes && <div className="survey-card-notes">{p.notes}</div>}
@@ -772,7 +772,7 @@ export default function SurveyMap() {
                     {(p.askingRent || p.askingPrice) && <div>Asking: {p.askingRent || p.askingPrice}</div>}
                     {p.nearestHighway && (
                       <div style={{ marginTop: 4, fontSize: '12px', color: '#e2c47a' }}>
-                        {'\u{1F6E3}\uFE0F'} {p.nearestHighway.distance_miles} mi to {p.nearestHighway.name}
+                        {'\u{1F6E3}\uFE0F'} {p.nearestHighway.distance_miles} mi to {p.nearestHighway.name}{p.nearestHighway.description ? ` (${p.nearestHighway.description})` : ''}
                       </div>
                     )}
                     {p.notes && <div className="survey-popup-notes">{p.notes}</div>}

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   MapContainer,
+  Circle,
   Marker,
   Popup,
   useMap,
@@ -144,6 +145,13 @@ Or paste JSON:
     onSubmit({ title: title || 'Market Survey', properties });
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
   return (
     <div className="survey-form-container">
       <div className="survey-form">
@@ -157,6 +165,7 @@ Or paste JSON:
           placeholder="e.g. Office Search — Harvie LLC"
           value={title}
           onChange={e => setTitle(e.target.value)}
+          onKeyDown={handleKeyDown}
         />
 
         <label className="survey-form-label">Properties</label>
@@ -166,7 +175,14 @@ Or paste JSON:
           placeholder={placeholder}
           value={textInput}
           onChange={e => setTextInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
         />
+        <p className="survey-form-shortcut">Ctrl+Enter to generate</p>
 
         {parseError && <p className="survey-form-error">{parseError}</p>}
 
@@ -209,6 +225,9 @@ export default function SurveyMap() {
   // UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mapStyle, setMapStyle] = useState(initialStyle);
+
+  // Drive-time overlay state: null = off, 5/15/30 = minutes
+  const [driveTimeMinutes, setDriveTimeMinutes] = useState(null);
 
   const mapRef = useRef(null);
   const mapPanelRef = useRef(null);
@@ -270,6 +289,14 @@ export default function SurveyMap() {
 
       setProperties(enriched);
       setFitBounds(valid.map(p => [p.lat, p.lng]));
+
+      // Update URL hash so this map is shareable
+      const sharePayload = {
+        title: data.title,
+        properties: data.properties.map(({ _raw, ...rest }) => rest),
+      };
+      const b64 = btoa(JSON.stringify(sharePayload));
+      window.history.replaceState(null, '', `${window.location.pathname}?mode=survey#data=${b64}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -713,6 +740,22 @@ export default function SurveyMap() {
               )}
             </div>
 
+            {/* Drive-time overlay */}
+            <div className="survey-drivetime-section">
+              <div className="survey-drivetime-label">Drive Time</div>
+              <div className="survey-drivetime-btns">
+                {[5, 15, 30].map(min => (
+                  <button
+                    key={min}
+                    className={`survey-drivetime-btn ${driveTimeMinutes === min ? 'active' : ''}`}
+                    onClick={() => setDriveTimeMinutes(driveTimeMinutes === min ? null : min)}
+                  >
+                    {min} min
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Map style toggle */}
             <div className="survey-controls">
               <button
@@ -746,6 +789,29 @@ export default function SurveyMap() {
         >
           <SurveyTileLayer style={mapStyle} />
           <MapController flyTo={flyTo} fitBounds={fitBounds} />
+
+          {/* Drive-time circles */}
+          {driveTimeMinutes && validProperties.map((p, i) => {
+            // Approximate drive-time radii (miles → meters)
+            // Urban Pittsburgh averages: 5min ≈ 1.5mi, 15min ≈ 5mi, 30min ≈ 12mi
+            const radiusMap = { 5: 2414, 15: 8047, 30: 19312 };
+            const radius = radiusMap[driveTimeMinutes] || 8047;
+            const isRec = p.recommended && p.rank <= 4;
+            return (
+              <Circle
+                key={`dt-${i}`}
+                center={[p.lat, p.lng]}
+                radius={radius}
+                pathOptions={{
+                  color: isRec ? '#2E7D32' : '#546E7A',
+                  fillColor: isRec ? '#2E7D32' : '#546E7A',
+                  fillOpacity: 0.08,
+                  weight: 1.5,
+                  dashArray: '6 4',
+                }}
+              />
+            );
+          })}
 
           {/* Property markers */}
           {validProperties.map((p, i) => {

@@ -1291,9 +1291,55 @@ body {
   margin-bottom: 8px;
 }
 
+/* ── Drive-time overlay ───────────────────────────────────────────── */
+.survey-drivetime-section {
+  padding: 8px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.survey-drivetime-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.survey-drivetime-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.survey-drivetime-btn {
+  flex: 1;
+  padding: 5px 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.survey-drivetime-btn:hover {
+  border-color: var(--gold);
+  color: var(--text);
+}
+
+.survey-drivetime-btn.active {
+  background: rgba(201, 168, 76, 0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 600;
+}
+
 /* ── Controls & Export ────────────────────────────────────────────── */
 .survey-controls {
-  padding: 8px 16px;
+  padding: 6px 16px;
   border-top: 1px solid var(--border);
 }
 
@@ -1554,4 +1600,13 @@ body {
   margin-top: 12px;
   text-align: center;
   font-family: 'DM Sans', sans-serif;
+}
+
+.survey-form-shortcut {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-align: right;
+  font-family: 'DM Sans', sans-serif;
+  opacity: 0.6;
 }

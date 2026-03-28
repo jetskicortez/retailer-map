@@ -29,6 +29,11 @@ function haversine(lat1, lng1, lat2, lng2) {
 // ── Map helpers ──────────────────────────────────────────────────────
 function MapController({ flyTo, fitBounds }) {
   const map = useMap();
+  // Expose map on window for Puppeteer automation
+  useEffect(() => {
+    window.__surveyMap = map;
+    return () => { window.__surveyMap = null; };
+  }, [map]);
   useEffect(() => {
     if (fitBounds && fitBounds.length > 0) {
       map.fitBounds(fitBounds, { padding: [60, 60], maxZoom: 14 });

@@ -99,6 +99,39 @@ app.post('/api/geocode-batch', async (req, res) => {
   }
 });
 
+// ── Isochrone proxy (Valhalla — free, no API key) ────────────────
+app.post('/api/isochrone', async (req, res) => {
+  try {
+    const { lat, lng, minutes } = req.body;
+    if (!lat || !lng || !minutes) {
+      return res.status(400).json({ error: 'lat, lng, and minutes required' });
+    }
+
+    const response = await fetch('https://valhalla1.openstreetmap.de/isochrone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locations: [{ lat, lon: lng }],
+        costing: 'auto',
+        contours: [{ time: minutes }],
+        polygons: true,
+        generalize: 100,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Valhalla error: ${response.status} — ${errText}`);
+    }
+
+    const geojson = await response.json();
+    res.json(geojson);
+  } catch (err) {
+    console.error('Isochrone error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Known highway interchange locations (Pittsburgh metro area) ───
 // Each entry: [lat, lng, highway name, interchange description]
 // Source: PennDOT / Google Maps verified coordinates

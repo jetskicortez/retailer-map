@@ -1086,11 +1086,36 @@ body {
   color: #FF9800;
 }
 
+/* ── Show/Hide All controls ───────────────────────────────────────── */
+.survey-visibility-controls {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px 2px;
+}
+
+.survey-vis-btn {
+  flex: 1;
+  padding: 3px 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.survey-vis-btn:hover {
+  border-color: var(--gold);
+  color: var(--text);
+}
+
 /* ── Property list ────────────────────────────────────────────────── */
 .survey-property-list {
   overflow-y: auto;
   padding: 4px 6px;
-  max-height: calc(100vh - 360px);
+  max-height: calc(100vh - 400px);
   flex-shrink: 1;
 }
 
@@ -1218,6 +1243,53 @@ body {
   margin-top: 4px;
 }
 
+/* ── Eye toggle + hidden state ────────────────────────────────────── */
+.survey-eye-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 24px;
+  text-align: center;
+  border-radius: 4px;
+  transition: all 0.15s;
+  align-self: center;
+}
+
+.survey-eye-btn.on {
+  color: var(--gold);
+  opacity: 0.7;
+}
+
+.survey-eye-btn.on:hover {
+  opacity: 1;
+  background: rgba(201, 168, 76, 0.1);
+}
+
+.survey-eye-btn.off {
+  color: var(--text-muted);
+  opacity: 0.4;
+}
+
+.survey-eye-btn.off:hover {
+  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.survey-property-card.hidden-prop {
+  opacity: 0.4;
+}
+
+.survey-property-card.hidden-prop .survey-card-name,
+.survey-property-card.hidden-prop .survey-card-address,
+.survey-property-card.hidden-prop .survey-card-details {
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
+}
+
 /* ── Retailer accordion ───────────────────────────────────────────── */
 .survey-retailer-section {
   border-top: 1px solid var(--border);
@@ -1292,72 +1364,89 @@ body {
 }
 
 /* ── Drive-time overlay ───────────────────────────────────────────── */
-.survey-drivetime-section {
-  padding: 8px 16px;
-  border-top: 1px solid var(--border);
+.survey-drivetime-section.prominent {
+  padding: 10px 16px;
+  border-top: 2px solid var(--gold);
+  background: rgba(201, 168, 76, 0.06);
+  border-left: 3px solid var(--gold);
 }
 
 .survey-drivetime-label {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.survey-drivetime-hint {
+  font-size: 11px;
   color: var(--text-muted);
-  margin-bottom: 6px;
+  font-style: italic;
+  margin: 0;
 }
 
 .survey-drivetime-btns {
   display: flex;
-  gap: 4px;
+  gap: 5px;
 }
 
 .survey-drivetime-btn {
   flex: 1;
-  padding: 5px 0;
+  padding: 8px 0;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 600;
   font-family: 'DM Sans', sans-serif;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .survey-drivetime-btn:hover {
-  border-color: var(--gold);
-  color: var(--text);
+  background: rgba(201, 168, 76, 0.15);
+  color: var(--gold-hover);
 }
 
 .survey-drivetime-btn.active {
-  background: rgba(201, 168, 76, 0.15);
+  background: var(--gold);
   border-color: var(--gold);
-  color: var(--gold);
-  font-weight: 600;
+  color: var(--bg);
+  font-weight: 700;
 }
 
 /* ── Controls & Export ────────────────────────────────────────────── */
-.survey-controls {
-  padding: 6px 16px;
+.survey-controls.prominent {
+  padding: 8px 16px;
   border-top: 1px solid var(--border);
+  border-left: 3px solid rgba(201, 168, 76, 0.3);
+  background: rgba(201, 168, 76, 0.03);
 }
 
 .survey-style-btn {
   width: 100%;
-  padding: 6px 12px;
+  padding: 8px 12px;
   background: var(--card);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
+  border: 1px solid var(--gold);
+  color: var(--gold);
   border-radius: 6px;
+  font-weight: 600;
   cursor: pointer;
   font-size: 12px;
   font-family: 'DM Sans', sans-serif;
 }
 
 .survey-style-btn:hover {
-  border-color: var(--gold);
-  color: var(--text);
+  background: rgba(201, 168, 76, 0.15);
+  color: var(--gold-hover);
+}
+
+.survey-style-btn.active {
+  background: var(--gold);
+  color: var(--bg);
 }
 
 /* ── Map markers ──────────────────────────────────────────────────── */

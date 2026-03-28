@@ -1,11 +1,11 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   MapContainer,
-  Circle,
   Marker,
   Popup,
   useMap,
 } from 'react-leaflet';
+import LZString from 'lz-string';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import html2canvas from 'html2canvas';
@@ -71,10 +71,20 @@ function SurveyTileLayer({ style }) {
 function decodeHashData() {
   try {
     const hash = window.location.hash;
-    if (!hash || !hash.includes('data=')) return null;
-    const b64 = hash.split('data=')[1];
-    const json = atob(b64);
-    return JSON.parse(json);
+    if (!hash) return null;
+    // New compressed format: #s=<compressed>
+    if (hash.includes('s=')) {
+      const compressed = hash.split('s=')[1];
+      const json = LZString.decompressFromEncodedURIComponent(compressed);
+      return json ? JSON.parse(json) : null;
+    }
+    // Old format: #data=<base64>
+    if (hash.includes('data=')) {
+      const b64 = hash.split('data=')[1];
+      const json = atob(b64);
+      return JSON.parse(json);
+    }
+    return null;
   } catch (err) {
     console.error('Failed to decode survey data from URL hash:', err);
     return null;
@@ -228,12 +238,16 @@ export default function SurveyMap() {
 
   // Drive-time overlay state: null = off, 5/15/30 = minutes
   const [driveTimeMinutes, setDriveTimeMinutes] = useState(null);
+  const [hiddenProperties, setHiddenProperties] = useState(new Set());
+  const [isochroneGeoJSON, setIsochroneGeoJSON] = useState(null);
+  const [isochroneLoading, setIsochroneLoading] = useState(false);
 
   const mapRef = useRef(null);
   const mapPanelRef = useRef(null);
   const cardRefs = useRef({});
   const connectorDataRef = useRef([]);
   const isExportingRef = useRef(false);
+  const isochroneCache = useRef({}); // cache: `${lat},${lng},${minutes}` → geojson
 
   // ── Handle form submission ─────────────────────────────────────────
   const handleFormSubmit = useCallback(async (data) => {
@@ -295,8 +309,8 @@ export default function SurveyMap() {
         title: data.title,
         properties: data.properties.map(({ _raw, ...rest }) => rest),
       };
-      const b64 = btoa(JSON.stringify(sharePayload));
-      window.history.replaceState(null, '', `${window.location.pathname}?mode=survey#data=${b64}`);
+      const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(sharePayload));
+      window.history.replaceState(null, '', `${window.location.pathname}?mode=survey#s=${compressed}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -368,6 +382,50 @@ export default function SurveyMap() {
     fetchRetailers();
   }, [showRetailers, properties, retailers.length]);
 
+  // ── Fetch isochrone when property + drive time selected ──────────
+  useEffect(() => {
+    if (activePropertyIdx === null || !driveTimeMinutes) {
+      setIsochroneGeoJSON(null);
+      return;
+    }
+
+    const prop = properties[activePropertyIdx];
+    if (!prop?.geocoded || hiddenProperties.has(activePropertyIdx)) {
+      setIsochroneGeoJSON(null);
+      return;
+    }
+
+    const cacheKey = `${prop.lat},${prop.lng},${driveTimeMinutes}`;
+    if (isochroneCache.current[cacheKey]) {
+      setIsochroneGeoJSON(isochroneCache.current[cacheKey]);
+      return;
+    }
+
+    async function fetchIsochrone() {
+      setIsochroneLoading(true);
+      try {
+        const res = await fetch('/api/isochrone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: prop.lat, lng: prop.lng, minutes: driveTimeMinutes }),
+        });
+        if (res.ok) {
+          const geojson = await res.json();
+          isochroneCache.current[cacheKey] = geojson;
+          setIsochroneGeoJSON(geojson);
+        } else {
+          setIsochroneGeoJSON(null);
+        }
+      } catch {
+        setIsochroneGeoJSON(null);
+      } finally {
+        setIsochroneLoading(false);
+      }
+    }
+
+    fetchIsochrone();
+  }, [activePropertyIdx, driveTimeMinutes, properties, hiddenProperties]);
+
   // ── Filtered retailers ───────────────────────────────────────────
   const filteredRetailers = useMemo(() => {
     if (!showRetailers || retailers.length === 0) return [];
@@ -403,6 +461,27 @@ export default function SurveyMap() {
       return next;
     });
   }, []);
+
+  const togglePropertyVisibility = useCallback((idx) => {
+    setHiddenProperties(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+    // If hiding the active property, deselect it
+    if (!hiddenProperties.has(idx) && activePropertyIdx === idx) {
+      setActivePropertyIdx(null);
+      setDriveTimeMinutes(null);
+    }
+  }, [hiddenProperties, activePropertyIdx]);
+
+  const showAllProperties = useCallback(() => setHiddenProperties(new Set()), []);
+  const hideAllProperties = useCallback(() => {
+    setHiddenProperties(new Set(properties.map((_, i) => i)));
+    setActivePropertyIdx(null);
+    setDriveTimeMinutes(null);
+  }, [properties]);
 
   // ── Property marker creation ─────────────────────────────────────
   const getPropertyIcon = useCallback((prop, index) => {
@@ -579,6 +658,14 @@ export default function SurveyMap() {
     [properties]
   );
 
+  const visibleProperties = useMemo(
+    () => validProperties.filter((p) => {
+      const origIdx = properties.indexOf(p);
+      return !hiddenProperties.has(origIdx);
+    }),
+    [validProperties, properties, hiddenProperties]
+  );
+
   // ── Render ───────────────────────────────────────────────────────
   if (showForm) {
     return <SurveyForm onSubmit={handleFormSubmit} />;
@@ -634,16 +721,21 @@ export default function SurveyMap() {
         {sidebarOpen && (
           <>
             {/* Property list */}
+            <div className="survey-visibility-controls">
+              <button className="survey-vis-btn" onClick={showAllProperties}>Show All</button>
+              <button className="survey-vis-btn" onClick={hideAllProperties}>Hide All</button>
+            </div>
             <div className="survey-property-list">
               {properties.map((p, i) => {
                 const isRec = p.recommended && p.rank <= 4;
                 const isActive = activePropertyIdx === i;
+                const isHidden = hiddenProperties.has(i);
                 return (
                   <div
                     key={i}
                     ref={el => cardRefs.current[i] = el}
-                    className={`survey-property-card ${isActive ? 'active' : ''} ${!p.geocoded ? 'failed' : ''}`}
-                    onClick={() => p.geocoded && handlePropertyClick(i)}
+                    className={`survey-property-card ${isActive ? 'active' : ''} ${!p.geocoded ? 'failed' : ''} ${isHidden ? 'hidden-prop' : ''}`}
+                    onClick={() => p.geocoded && !isHidden && handlePropertyClick(i)}
                   >
                     <div className={`survey-rank-badge ${isRec ? 'recommended' : 'numbered'}`}>
                       {isRec && <span className="survey-star">{'★'}</span>}
@@ -666,6 +758,13 @@ export default function SurveyMap() {
                       {p.notes && <div className="survey-card-notes">{p.notes}</div>}
                       {!p.geocoded && <div className="survey-card-error">Could not locate address</div>}
                     </div>
+                    <button
+                      className={`survey-eye-btn ${isHidden ? 'off' : 'on'}`}
+                      onClick={(e) => { e.stopPropagation(); togglePropertyVisibility(i); }}
+                      title={isHidden ? 'Show on map' : 'Hide from map'}
+                    >
+                      {isHidden ? '\u25CB' : '\u25CF'}
+                    </button>
                   </div>
                 );
               })}
@@ -741,28 +840,35 @@ export default function SurveyMap() {
             </div>
 
             {/* Drive-time overlay */}
-            <div className="survey-drivetime-section">
-              <div className="survey-drivetime-label">Drive Time</div>
-              <div className="survey-drivetime-btns">
-                {[5, 15, 30].map(min => (
-                  <button
-                    key={min}
-                    className={`survey-drivetime-btn ${driveTimeMinutes === min ? 'active' : ''}`}
-                    onClick={() => setDriveTimeMinutes(driveTimeMinutes === min ? null : min)}
-                  >
-                    {min} min
-                  </button>
-                ))}
+            <div className="survey-drivetime-section prominent">
+              <div className="survey-drivetime-label">
+                {'\uD83D\uDD50'} Drive Time Isochrone
               </div>
+              {activePropertyIdx !== null && !hiddenProperties.has(activePropertyIdx) ? (
+                <div className="survey-drivetime-btns">
+                  {[5, 15, 30].map(min => (
+                    <button
+                      key={min}
+                      className={`survey-drivetime-btn ${driveTimeMinutes === min ? 'active' : ''}`}
+                      onClick={() => setDriveTimeMinutes(driveTimeMinutes === min ? null : min)}
+                    >
+                      {min} min
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="survey-drivetime-hint">Select a property to show drive time</p>
+              )}
+              {isochroneLoading && <p className="survey-drivetime-hint">Loading isochrone...</p>}
             </div>
 
             {/* Map style toggle */}
-            <div className="survey-controls">
+            <div className="survey-controls prominent">
               <button
-                className="survey-style-btn"
+                className={`survey-style-btn ${mapStyle === 'satellite' ? 'active' : ''}`}
                 onClick={() => setMapStyle(s => s === 'street' ? 'satellite' : 'street')}
               >
-                {mapStyle === 'street' ? '\u{1F6F0}\uFE0F Satellite' : '\u{1F5FA}\uFE0F Street'}
+                {mapStyle === 'street' ? '\u{1F6F0}\uFE0F Satellite View' : '\u{1F5FA}\uFE0F Street View'}
               </button>
             </div>
 
@@ -790,35 +896,15 @@ export default function SurveyMap() {
           <SurveyTileLayer style={mapStyle} />
           <MapController flyTo={flyTo} fitBounds={fitBounds} />
 
-          {/* Drive-time circles */}
-          {driveTimeMinutes && validProperties.map((p, i) => {
-            // Approximate drive-time radii (miles → meters)
-            // Urban Pittsburgh averages: 5min ≈ 1.5mi, 15min ≈ 5mi, 30min ≈ 12mi
-            const radiusMap = { 5: 2414, 15: 8047, 30: 19312 };
-            const radius = radiusMap[driveTimeMinutes] || 8047;
-            const isRec = p.recommended && p.rank <= 4;
-            return (
-              <Circle
-                key={`dt-${i}`}
-                center={[p.lat, p.lng]}
-                radius={radius}
-                pathOptions={{
-                  color: isRec ? '#2E7D32' : '#546E7A',
-                  fillColor: isRec ? '#2E7D32' : '#546E7A',
-                  fillOpacity: 0.08,
-                  weight: 1.5,
-                  dashArray: '6 4',
-                }}
-              />
-            );
-          })}
+          {/* Isochrone polygon */}
+          {isochroneGeoJSON && <IsochroneLayer geojson={isochroneGeoJSON} />}
 
-          {/* Property markers */}
-          {validProperties.map((p, i) => {
+          {/* Property markers — only visible ones */}
+          {visibleProperties.map((p, i) => {
             const origIdx = properties.indexOf(p);
             return (
               <Marker
-                key={`prop-${i}`}
+                key={`prop-${origIdx}`}
                 position={[p.lat, p.lng]}
                 icon={getPropertyIcon(p, origIdx)}
                 eventHandlers={{
@@ -879,6 +965,41 @@ export default function SurveyMap() {
       </div>
     </div>
   );
+}
+
+// ── Isochrone polygon layer ──────────────────────────────────────────
+function IsochroneLayer({ geojson }) {
+  const map = useMap();
+  const layerRef = useRef(null);
+
+  useEffect(() => {
+    if (layerRef.current) {
+      map.removeLayer(layerRef.current);
+      layerRef.current = null;
+    }
+
+    if (!geojson || !geojson.features) return;
+
+    layerRef.current = L.geoJSON(geojson, {
+      style: {
+        color: '#c9a84c',
+        weight: 2,
+        opacity: 0.8,
+        fillColor: '#c9a84c',
+        fillOpacity: 0.12,
+        dashArray: '6 3',
+      },
+    }).addTo(map);
+
+    return () => {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+        layerRef.current = null;
+      }
+    };
+  }, [geojson, map]);
+
+  return null;
 }
 
 // ── Map legend component ─────────────────────────────────────────────

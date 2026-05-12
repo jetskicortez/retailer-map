@@ -417,14 +417,15 @@ export default function App() {
     setError('');
   }, []);
 
-  // Fix object-fit images for html2canvas (which doesn't support object-fit)
+  // Fix object-fit images for html2canvas (which doesn't support object-fit).
+  // Must use setProperty with 'important' to override .sc-cell img { width/height: !important }.
   function fixObjectFitForExport(container) {
     const imgs = container.querySelectorAll('.logo-marker img, .sc-cell img');
     const originals = [];
     imgs.forEach((img) => {
       if (!img.naturalWidth || !img.naturalHeight) return;
-      const boxW = img.clientWidth || parseInt(img.style.width) || 44;
-      const boxH = img.clientHeight || parseInt(img.style.height) || 44;
+      const boxW = img.clientWidth || parseInt(img.getAttribute('width')) || 44;
+      const boxH = img.clientHeight || parseInt(img.getAttribute('height')) || 44;
       const imgRatio = img.naturalWidth / img.naturalHeight;
       const boxRatio = boxW / boxH;
       let drawW, drawH;
@@ -436,16 +437,22 @@ export default function App() {
         drawW = boxH * imgRatio;
       }
       originals.push({ img, origStyle: img.getAttribute('style') });
-      img.style.width = drawW + 'px';
-      img.style.height = drawH + 'px';
-      img.style.objectFit = 'fill';
+      img.style.setProperty('width', drawW + 'px', 'important');
+      img.style.setProperty('height', drawH + 'px', 'important');
+      img.style.setProperty('max-width', drawW + 'px', 'important');
+      img.style.setProperty('max-height', drawH + 'px', 'important');
+      img.style.setProperty('object-fit', 'fill', 'important');
     });
     return originals;
   }
 
   function restoreObjectFit(originals) {
     originals.forEach(({ img, origStyle }) => {
-      img.setAttribute('style', origStyle);
+      if (origStyle === null) {
+        img.removeAttribute('style');
+      } else {
+        img.setAttribute('style', origStyle);
+      }
     });
   }
 

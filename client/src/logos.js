@@ -479,7 +479,6 @@ export const LOGO_FILES = {
   'jersey mikes': 'Jersey Mikes.png',
   "jersey mike's subs": 'Jersey Mikes.png',
   'petsmart': 'PetSmart.png',
-  'advance auto parts': 'Advance Auto Parts.png',
   'circle k': 'Circle K.png',
   'sonic': 'Sonic.png',
   'sonic drive-in': 'Sonic.png',

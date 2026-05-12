@@ -27,7 +27,7 @@ console.log(`Output:  ${outputPath}`);
 
 const browser = await puppeteer.launch({
   executablePath: CHROME_PATH,
-  headless: false,
+  headless: 'new',
   args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1400,900'],
   defaultViewport: { width: 1400, height: 900 },
 });

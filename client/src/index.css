@@ -738,9 +738,33 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
   padding: 8px;
   cursor: grab;
+  position: relative;
+}
+
+.logo-count-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  background: #c9a84c;
+  color: #0f1923;
+  border-radius: 9px;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  border: 1.5px solid #ffffff;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .logo-marker img {
@@ -807,8 +831,10 @@ body {
 }
 
 .sc-cell img {
-  max-width: 44px;
-  max-height: 44px;
+  width: 44px !important;
+  height: 44px !important;
+  max-width: 44px !important;
+  max-height: 44px !important;
   object-fit: contain;
   display: block;
   background: #ffffff;

@@ -249,6 +249,8 @@ export const RETAILER_DOMAINS = {
   'ppg paints arena': 'ppgpaintsarena.com',
   'pins mechanical': 'pinsmechanical.com',
   'pins mechanical co': 'pinsmechanical.com',
+  'vitamin shoppe': 'vitaminshoppe.com',
+  'the vitamin shoppe': 'vitaminshoppe.com',
 };
 
 // Fallback: local logo files for brands BrandFetch may not cover well
@@ -660,7 +662,7 @@ export function getLogoMarkerW(logoUrl) {
   return Math.max(LOGO_MIN_W, Math.min(LOGO_MAX_W, Math.round(naturalW)));
 }
 
-export function createLogoIcon(logoUrl, retailerName) {
+export function createLogoIcon(logoUrl, retailerName, count = 1) {
   const markerW = getLogoMarkerW(logoUrl);
   // Inner dimensions after padding (8px) and border (1.5px) on each side
   const innerW = markerW - 19;
@@ -672,8 +674,10 @@ export function createLogoIcon(logoUrl, retailerName) {
     ? `this.onerror=function(){this.style.display='none'};this.src='${fallback}'`
     : "this.style.display='none'";
 
+  const badge = count > 1 ? `<div class="logo-count-badge">${count}</div>` : '';
+
   return L.divIcon({
-    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;"><img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="${onerror}" /></div>`,
+    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;">${badge}<img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="${onerror}" /></div>`,
     className: '',
     iconSize: [markerW, LOGO_H],
     iconAnchor: [markerW / 2, LOGO_H / 2],

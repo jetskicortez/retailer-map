@@ -175,8 +175,8 @@ export default function App() {
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const initialStyle = urlParams.get('style') || 'street';
 
-  const [address, setAddress] = useState('');
-  const [radius, setRadius] = useState('1');
+  const [address, setAddress] = useState(() => urlParams.get('address') || '');
+  const [radius, setRadius] = useState(() => urlParams.get('radius') || '1');
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [error, setError] = useState('');
@@ -220,6 +220,28 @@ export default function App() {
       return true;
     });
   }, [data, activeCategories, activeChainSizes]);
+
+  // Deduplicate by chain name: keep the closest location per chain, count the rest
+  const { dedupedRepresentatives, locationCountMap } = useMemo(() => {
+    const byName = new Map();
+    filteredRetailers.forEach(r => {
+      const key = r.name.toLowerCase().trim();
+      if (!byName.has(key)) {
+        byName.set(key, { rep: r, count: 1 });
+      } else {
+        const entry = byName.get(key);
+        entry.count++;
+        if (r.distance_miles < entry.rep.distance_miles) entry.rep = r;
+      }
+    });
+    const representatives = new Set();
+    const countMap = new Map();
+    byName.forEach(({ rep, count }) => {
+      representatives.add(rep);
+      countMap.set(rep, count);
+    });
+    return { dedupedRepresentatives: representatives, locationCountMap: countMap };
+  }, [filteredRetailers]);
 
   // Toggle helpers
   const toggleCategory = useCallback((cat) => {
@@ -346,6 +368,14 @@ export default function App() {
     }
   }, [address, radius]);
 
+  // Auto-trigger on load when ?address= and ?radius= are in the URL
+  useEffect(() => {
+    if (urlParams.get('address') && urlParams.get('radius')) {
+      handleGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Sidebar card click → fly to marker and open popup
   const handleCardClick = useCallback((idx) => {
     setActiveIdx(idx);
@@ -419,10 +449,10 @@ export default function App() {
     });
   }
 
-  // ── Shared export helper: capture map at 8.5×11 landscape ────────
-  // Standard letter landscape: 11in × 8.5in  →  aspect ratio 11:8.5
-  const EXPORT_W = 11 * 300; // 3300px at 300 DPI
-  const EXPORT_H = 8.5 * 300; // 2550px at 300 DPI
+  // ── Shared export helper: capture map at 16:9 (PowerPoint widescreen) ────────
+  // PowerPoint widescreen: 13.33in × 7.5in → 16:9 aspect ratio
+  const EXPORT_W = 3840; // 4K 16:9
+  const EXPORT_H = 2160;
 
   const captureMapForExport = useCallback(async () => {
     if (!mapPanelRef.current) return null;
@@ -455,8 +485,8 @@ export default function App() {
 
     // Force panel to landscape 11:8.5 aspect ratio using !important to
     // override any media-query rules (mobile sets width:100vw etc.)
-    const CAPTURE_W = 1100;
-    const CAPTURE_H = 850;
+    const CAPTURE_W = 1280;
+    const CAPTURE_H = 720;
     panel.style.cssText = `
       position: absolute !important;
       left: 0 !important;
@@ -844,10 +874,10 @@ export default function App() {
       const canvas = await captureMapForExport();
       if (!canvas) return;
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: 'letter' });
-      const pageW = pdf.internal.pageSize.getWidth();  // 11
-      const pageH = pdf.internal.pageSize.getHeight(); // 8.5
-      // Image is already exactly 11:8.5 so it fills the page edge-to-edge
+      // PowerPoint widescreen: 13.33in × 7.5in (16:9)
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'in', format: [13.33, 7.5] });
+      const pageW = 13.33;
+      const pageH = 7.5;
       pdf.addImage(imgData, 'PNG', 0, 0, pageW, pageH);
       const slug = data?.property?.display
         ?.replace(/[^a-zA-Z0-9]+/g, '_')
@@ -1135,17 +1165,19 @@ export default function App() {
             radiusMiles={parseFloat(radius)}
           >
             {data?.retailers.map((r, i) => {
-              if (!filteredRetailers.includes(r)) return null;
+              if (!dedupedRepresentatives.has(r)) return null;
+              const count = locationCountMap.get(r) || 1;
               const cfg = getCategoryConfig(r.category);
               const logoUrl = getLogoUrl(r.name);
+              const locationNote = count > 1 ? ` <span style="color:#c9a84c">(${count} locations)</span>` : '';
               return {
                 position: [r.lat, r.lng],
-                icon: logoUrl ? createLogoIcon(logoUrl, r.name) : createRetailerIcon(r.category),
+                icon: logoUrl ? createLogoIcon(logoUrl, r.name, count) : createRetailerIcon(r.category),
                 idx: i,
                 name: r.name,
                 category: r.category,
                 logoUrl: logoUrl || null,
-                popup: `<div class="popup-name">${r.name}</div>
+                popup: `<div class="popup-name">${r.name}${locationNote}</div>
                   <div class="popup-category" style="color:${cfg.color}">${cfg.emoji} ${r.category}</div>
                   <div class="popup-address">${r.address}</div>
                   <div class="popup-distance">${r.distance_miles.toFixed(1)} miles from property</div>`,

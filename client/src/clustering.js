@@ -59,6 +59,7 @@ export const CLUSTER_PAD = 8;         // px padding inside cluster border
 export const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
 export const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
 
+
 // Zoom-adaptive extra padding for merge detection:
 // At low zoom we pad more so distant markers merge sooner
 export function getClusterPadding(zoom) {
@@ -283,8 +284,8 @@ function pushAwayFrom(mover, anchor) {
 export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles) {
   const mapSize = map.getSize();
   const propPt = map.latLngToContainerPoint(propertyLatLng);
-  const MARGIN_X = 20;  // px from left/right edge
-  const MARGIN_Y = 30;  // px from top/bottom edge
+  const MARGIN_X = 40;  // px from left/right edge
+  const MARGIN_Y = 50;  // px from top/bottom edge
   const GAP_Y = 10;     // vertical gap between logos in a column
 
   // Compute radius ring position in pixels for column placement
@@ -350,15 +351,34 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
       startY = usableTop;
     }
 
-    return items.map((c) => {
+    const positions = items.map((c) => {
       const y = startY + c.h / 2;
-      // Align: right-align for left column, left-align for right column
       const x = alignRight
         ? Math.max(MARGIN_X + c.w / 2, colEdgeX - c.w / 2)
         : Math.min(mapSize.x - MARGIN_X - c.w / 2, colEdgeX + c.w / 2);
       startY += c.h + effectiveGap;
       return { idx: c.idx, x, y, origX: c.cx, origY: c.cy };
     });
+
+    // Shift column up if last item overflows the bottom boundary
+    if (positions.length > 0) {
+      const lastItem = items[positions.length - 1];
+      const lastPos = positions[positions.length - 1];
+      const actualBottom = lastPos.y + lastItem.h / 2;
+      if (actualBottom > usableBottom) {
+        const shift = actualBottom - usableBottom;
+        positions.forEach(p => { p.y -= shift; });
+      }
+      // Clamp top in case the shift pushed first item above usableTop
+      const firstItem = items[0];
+      const firstPos = positions[0];
+      if (firstPos.y - firstItem.h / 2 < usableTop) {
+        const upshift = usableTop - (firstPos.y - firstItem.h / 2);
+        positions.forEach(p => { p.y += upshift; });
+      }
+    }
+
+    return positions;
   }
 
   const leftPositions = layoutColumn(leftItems, leftColRight, true);

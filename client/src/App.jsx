@@ -13,7 +13,16 @@ import { jsPDF } from 'jspdf';
 import { RETAILER_DOMAINS, LOGO_FILES, getLogoUrl, getFallbackLogoUrl, preloadLogo, getLogoMarkerW, createLogoIcon, LOGO_H, LOGO_MIN_W, LOGO_MAX_W } from './logos.js';
 import { CATEGORIES, getCategoryConfig, createRetailerIcon, MARKER_PAD, SmartClusterLayer } from './clustering.js';
 
-// ── SVG icon builders ────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function getStreetAddress(fullAddress) {
   if (!fullAddress) return 'SUBJECT PROPERTY';
   // Extract street portion: everything before the city/state/zip
@@ -24,11 +33,10 @@ function getStreetAddress(fullAddress) {
 
 function createPropertyIcon(streetAddress) {
   const label = streetAddress || 'SUBJECT PROPERTY';
-  // Estimate label width: ~9.5px per character (11px uppercase + 1.5px letter-spacing), min 140px
   const labelW = Math.max(140, label.length * 9.5 + 28);
   const html = `<div class="property-marker">
     <div class="property-pulse"></div>
-    <div class="property-label">${label}</div>
+    <div class="property-label">${escHtml(label)}</div>
     <div class="property-pin">
       <svg width="36" height="46" viewBox="0 0 36 46" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -174,11 +182,13 @@ export default function App() {
   // Read URL params for automation (Puppeteer can pass ?style=satellite)
   const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
   const initialStyle = urlParams.get('style') || 'street';
+  const embedMode = urlParams.get('embed') === 'true';
 
   const [address, setAddress] = useState(() => urlParams.get('address') || '');
   const [radius, setRadius] = useState(() => urlParams.get('radius') || '1');
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
+  const [exportingType, setExportingType] = useState(null); // 'png' | 'pdf' | null
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
   const [activeIdx, setActiveIdx] = useState(null);
@@ -758,31 +768,52 @@ export default function App() {
           };
         }).filter((c) => c.dist > 5);
 
-        // Pass 1: Draw connector lines in full (no clipping)
+        // Pass 1: Draw bezier connector lines in full (no clipping)
         connectors.forEach(({ fromX, fromY, toX, toY }) => {
           const x1 = fromX * scaleX, y1 = fromY * scaleY;
           const x2 = toX * scaleX, y2 = toY * scaleY;
+          // Match the BezierConnector bow formula (upward arc)
+          const mx = (x1 + x2) / 2;
+          const my = (y1 + y2) / 2;
+          const hDist = Math.abs(x2 - x1);
+          const vDist = Math.abs(y2 - y1);
+          const bow = Math.min(hDist * 0.18 + vDist * 0.05, 32 * scaleX);
+          const cpX = mx;
+          const cpY = my - bow;
 
+          // Shadow pass
           ctx.beginPath();
           ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-          ctx.lineWidth = 8 * scaleX;
+          ctx.quadraticCurveTo(cpX, cpY, x2, y2);
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+          ctx.lineWidth = 7 * scaleX;
           ctx.stroke();
+          // Main line (gold-white)
           ctx.beginPath();
           ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 4 * scaleX;
+          ctx.quadraticCurveTo(cpX, cpY, x2, y2);
+          ctx.strokeStyle = '#e8d9a8';
+          ctx.lineWidth = 2.5 * scaleX;
+          ctx.globalAlpha = 0.92;
           ctx.stroke();
+          ctx.globalAlpha = 1;
 
-          // White dot at actual retailer location
+          // Target-style anchor dot: halo → gold ring → white center
           ctx.beginPath();
           ctx.arc(x2, y2, 7 * scaleX, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
           ctx.fill();
           ctx.beginPath();
           ctx.arc(x2, y2, 5 * scaleX, 0, Math.PI * 2);
+          ctx.fillStyle = '#c9a84c';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x2, y2, 5 * scaleX, 0, Math.PI * 2);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5 * scaleX;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x2, y2, 2.5 * scaleX, 0, Math.PI * 2);
           ctx.fillStyle = '#ffffff';
           ctx.fill();
         });
@@ -849,6 +880,8 @@ export default function App() {
 
   // Export map as high-res PNG (8.5×11 landscape)
   const handleExportImage = useCallback(async () => {
+    if (exportingType) return;
+    setExportingType('png');
     try {
       const canvas = await captureMapForExport();
       if (!canvas) return;
@@ -872,11 +905,15 @@ export default function App() {
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (err) {
       console.error('Export error:', err);
+    } finally {
+      setExportingType(null);
     }
-  }, [data, captureMapForExport]);
+  }, [data, captureMapForExport, exportingType]);
 
   // Export map as PDF (8.5×11 landscape, full-bleed)
   const handleExportPDF = useCallback(async () => {
+    if (exportingType) return;
+    setExportingType('pdf');
     try {
       const canvas = await captureMapForExport();
       if (!canvas) return;
@@ -893,27 +930,31 @@ export default function App() {
       pdf.save(`${slug}_map.pdf`);
     } catch (err) {
       console.error('PDF export error:', err);
+    } finally {
+      setExportingType(null);
     }
-  }, [data, captureMapForExport]);
+  }, [data, captureMapForExport, exportingType]);
 
   return (
     <div className="app">
       {/* ─── Mobile hamburger ─── */}
-      <button
-        className="mobile-menu-btn"
-        onClick={() => setSidebarOpen((v) => !v)}
-        aria-label="Toggle sidebar"
-      >
-        {sidebarOpen ? '\u2715' : '\u2630'}
-      </button>
+      {!embedMode && (
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setSidebarOpen((v) => !v)}
+          aria-label="Toggle sidebar"
+        >
+          {sidebarOpen ? '\u2715' : '\u2630'}
+        </button>
+      )}
 
       {/* ─── Mobile overlay ─── */}
-      {sidebarOpen && (
+      {!embedMode && sidebarOpen && (
         <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* ─── Sidebar ─── */}
-      <aside className={`sidebar${sidebarOpen ? ' open' : ' collapsed'}`}>
+      {!embedMode && <aside className={`sidebar${sidebarOpen ? ' open' : ' collapsed'}`}>
         <div className="sidebar-header">
           <div className="brand-text">
             <div className="brand-name">The Colony Agency</div>
@@ -963,7 +1004,7 @@ export default function App() {
           >
             {loading ? 'Generating\u2026' : 'Generate Map'}
           </button>
-          {error && <div className="error-msg">{error}</div>}
+          {error && <div className="error-msg" role="alert">{error}</div>}
         </div>
 
         {/* Filter Section */}
@@ -1029,13 +1070,6 @@ export default function App() {
             <>
               <div className="list-header">
                 Retailers
-                <span className="list-count">
-                  {filteredRetailers.length}
-                  {filteredRetailers.length !== data.retailers.length
-                    ? ` / ${data.retailers.length}`
-                    : ''}{' '}
-                  found
-                </span>
               </div>
 
               <div className="retailer-list">
@@ -1047,7 +1081,10 @@ export default function App() {
                       key={origIdx}
                       ref={(el) => (cardRefs.current[`c-${origIdx}`] = el)}
                       className={`retailer-card${activeIdx === origIdx ? ' active' : ''}`}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleCardClick(origIdx)}
+                      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleCardClick(origIdx)}
                     >
                       <div
                         className="card-dot"
@@ -1079,29 +1116,29 @@ export default function App() {
           <div className="step-label"><span className="step-number">3</span> Export</div>
           <div className="export-buttons">
             <button
-              className="btn-export primary"
-              disabled={!data}
+              className={`btn-export primary${exportingType === 'png' ? ' exporting' : ''}`}
+              disabled={!data || !!exportingType}
               onClick={handleExportImage}
             >
-              Export PNG
+              {exportingType === 'png' ? <><span className="btn-export-spinner" />PNG</> : 'Export PNG'}
             </button>
             <button
-              className="btn-export primary"
-              disabled={!data}
+              className={`btn-export primary${exportingType === 'pdf' ? ' exporting' : ''}`}
+              disabled={!data || !!exportingType}
               onClick={handleExportPDF}
             >
-              Export PDF
+              {exportingType === 'pdf' ? <><span className="btn-export-spinner" />PDF</> : 'Export PDF'}
             </button>
             <button
               className="btn-export"
-              disabled={!data}
+              disabled={!data || !!exportingType}
               onClick={() => data && exportCSV(data.property, data.retailers)}
             >
               Export CSV
             </button>
           </div>
         </div>
-      </aside>
+      </aside>}
 
       {/* ─── Map Panel ─── */}
       <div className={`map-panel${mapStyle === 'satellite' ? ' satellite' : ''}`} ref={mapPanelRef}>
@@ -1184,9 +1221,9 @@ export default function App() {
                 name: r.name,
                 category: r.category,
                 logoUrl: logoUrl || null,
-                popup: `<div class="popup-name">${r.name}${locationNote}</div>
-                  <div class="popup-category" style="color:${cfg.color}">${cfg.emoji} ${r.category}</div>
-                  <div class="popup-address">${r.address}</div>
+                popup: `<div class="popup-name">${escHtml(r.name)}${locationNote}</div>
+                  <div class="popup-category" style="color:${escHtml(cfg.color)}">${cfg.emoji} ${escHtml(r.category)}</div>
+                  <div class="popup-address">${escHtml(r.address)}</div>
                   <div class="popup-distance">${r.distance_miles.toFixed(1)} miles from property</div>`,
               };
             }).filter(Boolean)}
@@ -1201,7 +1238,7 @@ export default function App() {
         )}
 
         {/* Mobile export bar */}
-        {data && (
+        {!embedMode && data && (
           <div className="mobile-export-bar">
             <button className="btn-export primary" onClick={handleExportImage}>PNG</button>
             <button className="btn-export primary" onClick={handleExportPDF}>PDF</button>

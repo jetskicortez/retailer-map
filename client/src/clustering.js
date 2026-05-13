@@ -69,7 +69,6 @@ export function getClusterPadding(zoom) {
   return 20;                    // reduced from 28
 }
 
-// SVG renderer for connecting lines (html2canvas captures SVG DOM elements reliably)
 // Connector pane — created lazily, sits below markers
 export function ensureConnectorPane(map) {
   if (!map.getPane('connectorPane')) {
@@ -77,6 +76,29 @@ export function ensureConnectorPane(map) {
     pane.style.zIndex = '350'; // Below overlayPane (400) and markerPane (600)
   }
 }
+
+// ── Bezier connector line (extends L.Polyline for correct projection + pane) ──
+// Draws a quadratic bezier curve from logo marker to actual retailer location.
+// Control point bows gently upward from midpoint, creating a graceful arc
+// that reads clearly as "this logo belongs at that map point."
+const BezierConnector = L.Polyline.extend({
+  _updatePath() {
+    if (!this._path || !this._rings[0] || this._rings[0].length < 2) return;
+    const p = this._rings[0];
+    const x1 = p[0].x, y1 = p[0].y;
+    const x2 = p[1].x, y2 = p[1].y;
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const hDist = Math.abs(x2 - x1);
+    const vDist = Math.abs(y2 - y1);
+    // Bow amount: proportional to horizontal span, capped at 32px
+    const bow = Math.min(hDist * 0.18 + vDist * 0.05, 32);
+    // Control point arcs upward (negative y = up on screen)
+    const cpX = mx;
+    const cpY = my - bow;
+    this._path.setAttribute('d', `M ${x1} ${y1} Q ${cpX} ${cpY} ${x2} ${y2}`);
+  },
+});
 
 // ── Step 1: Group nearby markers into clusters (pixel space) ─────
 export function buildClusters(map, items) {
@@ -552,49 +574,60 @@ export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propert
             padH: cluster.h,
           });
 
-          // Connector line — white with dark outline for visibility
-          const shadow = L.polyline(
+          // Bezier connector — shadow (thick dark) + main (thinner gold-white)
+          const shadow = new BezierConnector(
             [markerLatLng, cluster.centroidLatLng],
             {
-              weight: 8,
+              weight: 7,
               color: '#000000',
-              opacity: 0.3,
+              opacity: 0.22,
               interactive: false,
               pane: 'connectorPane',
             }
           );
           lines.addLayer(shadow);
-          const line = L.polyline(
+          const line = new BezierConnector(
             [markerLatLng, cluster.centroidLatLng],
             {
-              weight: 4,
-              color: '#ffffff',
-              opacity: 1,
+              weight: 2.5,
+              color: '#e8d9a8',
+              opacity: 0.92,
               interactive: false,
               pane: 'connectorPane',
             }
           );
           lines.addLayer(line);
 
-          // White dot with dark outline at actual location
-          const dotShadow = L.circleMarker(cluster.centroidLatLng, {
+          // Target-style anchor dot at actual retailer location:
+          // outer ring (dark halo) → mid ring (gold) → inner dot (white)
+          const halo = L.circleMarker(cluster.centroidLatLng, {
             radius: 7,
             fillColor: '#000000',
-            fillOpacity: 0.3,
+            fillOpacity: 0.25,
             stroke: false,
             interactive: false,
             pane: 'connectorPane',
           });
-          lines.addLayer(dotShadow);
-          const dot = L.circleMarker(cluster.centroidLatLng, {
+          lines.addLayer(halo);
+          const ring = L.circleMarker(cluster.centroidLatLng, {
             radius: 5,
+            fillColor: '#c9a84c',
+            fillOpacity: 1,
+            color: '#ffffff',
+            weight: 1.5,
+            interactive: false,
+            pane: 'connectorPane',
+          });
+          lines.addLayer(ring);
+          const innerDot = L.circleMarker(cluster.centroidLatLng, {
+            radius: 2.5,
             fillColor: '#ffffff',
             fillOpacity: 1,
             stroke: false,
             interactive: false,
             pane: 'connectorPane',
           });
-          lines.addLayer(dot);
+          lines.addLayer(innerDot);
         }
       });
 

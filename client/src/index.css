@@ -708,6 +708,52 @@ body {
   color: var(--gold);
 }
 
+/* ---- Traffic Count Badge ---- */
+.traffic-badge {
+  position: absolute;
+  bottom: 32px;
+  left: 12px;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  max-width: 200px;
+  padding: 5px 10px;
+  background: rgba(59, 13, 20, 0.92);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'DM Sans', sans-serif;
+  pointer-events: none;
+}
+
+.traffic-vpd {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.traffic-sep {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0 1px;
+  flex-shrink: 0;
+}
+
+.traffic-road {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 /* ---- Loading Bar ---- */
 .loading-bar {
   position: absolute;

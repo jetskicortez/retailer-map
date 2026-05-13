@@ -583,6 +583,9 @@ export function SmartClusterLayer({ children, onMarkerClick, onClusterClick, mar
             const targetZoom = Math.min(map.getZoom() + 2, 18);
             map.flyTo(cluster.centroidLatLng, targetZoom, { duration: 0.45 });
             if (onClusterClick) onClusterClick();
+            if (cluster.items.length > 0 && onMarkerClick) {
+              onMarkerClick(cluster.items[0].idx);
+            }
           });
           if (!snapped) marker.on('dragstart', () => { justDragged.current = true; });
           if (!snapped) marker.on('dragend', (e) => {

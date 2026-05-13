@@ -186,6 +186,11 @@ export default function App() {
 
   const [address, setAddress] = useState(() => urlParams.get('address') || '');
   const [radius, setRadius] = useState(() => urlParams.get('radius') || '1');
+
+  // Traffic count params (passed by Stella / capture-map.mjs)
+  const trafficVpd = useMemo(() => urlParams.get('traffic_vpd') || '', [urlParams]);
+  const trafficRoad = useMemo(() => urlParams.get('traffic_road') || '', [urlParams]);
+
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState('');
   const [exportingType, setExportingType] = useState(null); // 'png' | 'pdf' | null
@@ -1173,6 +1178,15 @@ export default function App() {
             <button className="map-btn" onClick={handleClear}>
               Clear
             </button>
+          </div>
+        )}
+
+        {/* ─── Traffic count badge (bottom-left, above Leaflet zoom controls) ─── */}
+        {trafficVpd && (
+          <div className="traffic-badge">
+            <span className="traffic-vpd">{trafficVpd} VPD</span>
+            {trafficRoad && <span className="traffic-sep"> · </span>}
+            {trafficRoad && <span className="traffic-road">{trafficRoad}</span>}
           </div>
         )}
 

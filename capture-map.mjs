@@ -13,17 +13,38 @@ const address = process.argv[2];
 const outputPath = process.argv[3];
 
 if (!address || !outputPath) {
-  console.error('Usage: node capture-map.mjs "Address" "output/path.png"');
+  console.error('Usage: node capture-map.mjs "Address" "output/path.png" [--traffic-vpd 32000] [--traffic-road "Road Name"]');
   process.exit(1);
 }
 
+// Parse optional traffic flags from remaining args
+let trafficVpd = '';
+let trafficRoad = '';
+for (let i = 4; i < process.argv.length; i++) {
+  if (process.argv[i] === '--traffic-vpd' && process.argv[i + 1]) {
+    trafficVpd = process.argv[++i];
+  } else if (process.argv[i] === '--traffic-road' && process.argv[i + 1]) {
+    trafficRoad = process.argv[++i];
+  }
+}
+
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const APP_URL = 'https://retailer-map.vercel.app';
+const APP_BASE_URL = 'https://retailer-map.vercel.app';
+
+// Build page URL — append traffic params if provided so the badge renders on load
+const pageUrlParams = new URLSearchParams();
+if (trafficVpd) pageUrlParams.set('traffic_vpd', trafficVpd);
+if (trafficRoad) pageUrlParams.set('traffic_road', trafficRoad);
+const APP_URL = pageUrlParams.toString()
+  ? `${APP_BASE_URL}?${pageUrlParams.toString()}`
+  : APP_BASE_URL;
+
 const DOWNLOAD_DIR = resolve(tmpdir(), `retailer-map-${Date.now()}`);
 mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
 console.log(`Address: ${address}`);
 console.log(`Output:  ${outputPath}`);
+if (trafficVpd) console.log(`Traffic: ${trafficVpd} VPD${trafficRoad ? ` · ${trafficRoad}` : ''}`);
 
 const browser = await puppeteer.launch({
   executablePath: CHROME_PATH,

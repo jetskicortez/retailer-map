@@ -456,6 +456,11 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
   return result;
 }
 
+// Zoom level above which logos snap directly to their actual map position
+// (no column displacement, no connector lines). At this zoom, retailers
+// have enough screen space to sit on their real locations without overlap.
+const SNAP_ZOOM = 15;
+
 // ── Step 4: SmartClusterLayer component ──────────────────────────
 export function SmartClusterLayer({ children, onMarkerClick, onClusterClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef, radiusMiles }) {
   const map = useMap();
@@ -516,42 +521,51 @@ export function SmartClusterLayer({ children, onMarkerClick, onClusterClick, mar
       // Step 1: Build clusters
       const clusters = buildClusters(map, items);
 
-      // Step 2: Displace clusters to avoid subject property + each other
-      const displaced = displaceClusterRects(map, clusters, propLL, radiusMiles);
+      // At high zoom, logos snap to their real map positions — no displacement, no lines.
+      // Below SNAP_ZOOM, run the full column-displacement algorithm as normal.
+      const zoom = map.getZoom();
+      const snapped = zoom >= SNAP_ZOOM;
+
+      // Step 2: Displace clusters to avoid subject property + each other (skip when snapped)
+      const displaced = snapped ? null : displaceClusterRects(map, clusters, propLL, radiusMiles);
 
       // Step 3: Render each cluster or single marker
       clusters.forEach((cluster, ci) => {
-        const dp = displaced[ci];
-        if (!dp) return;
+        const dp = displaced ? displaced[ci] : null;
 
         const clusterKey = getClusterKey(cluster);
-        const overridePos = dragOverrides.current[clusterKey];
-        const markerLatLng = overridePos || dp.displacedLatLng;
+        const overridePos = snapped ? null : dragOverrides.current[clusterKey];
+        // Snapped: always use real centroid. Otherwise: drag override → displaced → centroid.
+        const markerLatLng = snapped
+          ? cluster.centroidLatLng
+          : (overridePos || dp?.displacedLatLng || cluster.centroidLatLng);
 
-        // Show connector if user dragged this marker OR if collision algorithm displaced it
+        // Show connector only when not snapped and actually displaced
         const finalPt = map.latLngToContainerPoint(markerLatLng);
         const origPt = map.latLngToContainerPoint(cluster.centroidLatLng);
         const dist = Math.hypot(finalPt.x - origPt.x, finalPt.y - origPt.y);
-        const isDisplaced = !!overridePos || dist > 1;
+        const isDisplaced = !snapped && (!!overridePos || dist > 1);
 
         if (cluster.type === 'single') {
           const item = cluster.items[0];
           const child = childByIdx.get(item.idx);
           if (!child) return;
 
-          const marker = L.marker(markerLatLng, { icon: child.icon, draggable: true });
+          const marker = L.marker(markerLatLng, { icon: child.icon, draggable: !snapped });
           if (child.popup) marker.bindPopup(child.popup, { maxWidth: 260, autoPan: false });
           marker.on('click', () => {
             marker.openPopup();
             if (onMarkerClick) onMarkerClick(item.idx);
           });
-          marker.on('dragstart', () => { justDragged.current = true; });
-          marker.on('dragend', (e) => {
-            const pos = e.target.getLatLng();
-            dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
-            justDragged.current = true;
-            render();
-          });
+          if (!snapped) {
+            marker.on('dragstart', () => { justDragged.current = true; });
+            marker.on('dragend', (e) => {
+              const pos = e.target.getLatLng();
+              dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
+              justDragged.current = true;
+              render();
+            });
+          }
           if (markerRefs) markerRefs.current[`r-${item.idx}`] = marker;
           layers.addLayer(marker);
         } else {
@@ -563,15 +577,15 @@ export function SmartClusterLayer({ children, onMarkerClick, onClusterClick, mar
             // Fallback to simple icon
             icon = L.divIcon({ html: `<div style="background:white;padding:4px;border-radius:4px;">${cluster.items.length} retailers</div>`, className: '', iconSize: [100, 30] });
           }
-          const marker = L.marker(markerLatLng, { icon, draggable: true });
+          const marker = L.marker(markerLatLng, { icon, draggable: !snapped });
 
           marker.on('click', () => {
             const targetZoom = Math.min(map.getZoom() + 2, 18);
             map.flyTo(cluster.centroidLatLng, targetZoom, { duration: 0.45 });
             if (onClusterClick) onClusterClick();
           });
-          marker.on('dragstart', () => { justDragged.current = true; });
-          marker.on('dragend', (e) => {
+          if (!snapped) marker.on('dragstart', () => { justDragged.current = true; });
+          if (!snapped) marker.on('dragend', (e) => {
             const pos = e.target.getLatLng();
             dragOverrides.current[clusterKey] = [pos.lat, pos.lng];
             justDragged.current = true;

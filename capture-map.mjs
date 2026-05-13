@@ -5,7 +5,7 @@
 
 import puppeteer from 'puppeteer-core';
 import { resolve } from 'path';
-import { existsSync, renameSync, readdirSync, mkdirSync } from 'fs';
+import { existsSync, renameSync, readdirSync, mkdirSync, statSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -121,4 +121,15 @@ if (!downloaded || !existsSync(downloaded)) {
 // Move to final destination
 const outAbs = resolve(outputPath.replace(/^\/c\//, 'C:/').replace(/\//g, '\\'));
 renameSync(downloaded, outAbs);
+
+// Validate: blank/all-white PNGs compress to <30KB; real map screenshots are 400KB+.
+// Bail out now so the caller (Stella) doesn't send a blank image to Claude.
+const { size } = statSync(outAbs);
+console.log(`File size: ${(size / 1024).toFixed(1)} KB`);
+if (size < 51200) {
+  console.error(`ERROR: Image too small (${(size / 1024).toFixed(1)} KB) — likely blank or white. Map may not have rendered.`);
+  unlinkSync(outAbs); // remove bad file so Stella doesn't pick it up
+  process.exit(1);
+}
+
 console.log(`Saved: ${outAbs}`);

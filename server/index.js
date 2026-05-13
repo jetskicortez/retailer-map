@@ -720,6 +720,9 @@ app.get('/api/logo/:domain', async (req, res) => {
       const contentType = response.headers.get('content-type') || '';
       if (response.ok && contentType.includes('image')) {
         const buffer = Buffer.from(await response.arrayBuffer());
+        // Brandfetch sometimes returns a tiny blank/transparent PNG for unknown domains.
+        // Anything under 300 bytes is not a real logo — skip it and try the next pattern.
+        if (buffer.length < 300) continue;
         logoCache.set(domain, { buffer, contentType, timestamp: Date.now() });
         res.set('Content-Type', contentType);
         res.set('Cache-Control', 'public, max-age=86400');

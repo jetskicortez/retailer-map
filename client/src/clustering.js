@@ -229,7 +229,7 @@ export function createClusterGridIcon(cluster, childrenData) {
   }).join('');
 
   return L.divIcon({
-    html: `<div class="smart-cluster" style="width:${gridW}px;height:${gridH}px;grid-template-columns:repeat(${cols},${CLUSTER_CELL}px);">${cells}<div class="sc-count">${items.length}</div></div>`,
+    html: `<div class="smart-cluster" style="width:${gridW}px;height:${gridH}px;grid-template-columns:repeat(${cols},${CLUSTER_CELL}px);">${cells}</div>`,
     className: '',
     iconSize: [gridW, gridH],
     iconAnchor: [gridW / 2, gridH / 2],

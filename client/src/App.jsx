@@ -199,6 +199,7 @@ export default function App() {
   const [activeCategories, setActiveCategories] = useState(new Set());
   const [activeChainSizes, setActiveChainSizes] = useState(new Set(['National']));
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [filterCollapsed, setFilterCollapsed] = useState(false);
   const [mapStyle, setMapStyle] = useState(initialStyle); // 'street' or 'satellite' (reads from ?style= URL param)
 
   const markerRefs = useRef({});
@@ -1009,8 +1010,20 @@ export default function App() {
 
         {/* Filter Section */}
         <div className={`filter-section${data ? '' : ' disabled-section'}`}>
-          <div className="step-label"><span className="step-number">2</span> Filter Results</div>
-          {data ? (
+          <div className="filter-section-header">
+            <div className="step-label"><span className="step-number">2</span> Filter Results</div>
+            {data && (
+              <button
+                className="filter-collapse-btn"
+                onClick={() => setFilterCollapsed(c => !c)}
+                aria-label={filterCollapsed ? 'Expand filters' : 'Collapse filters'}
+              >
+                <span className={`filter-collapse-chevron${filterCollapsed ? ' up' : ''}`}>›</span>
+              </button>
+            )}
+          </div>
+          {!data && <div className="step-hint">Generate a map to see filter options</div>}
+          {data && !filterCollapsed ? (
             <div className="filter-body">
               <div className="filter-summary">
                 <span className="list-count">
@@ -1059,9 +1072,7 @@ export default function App() {
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="step-hint">Generate a map to see filter options</div>
-          )}
+          ) : null}
         </div>
 
         {/* Retailer List */}

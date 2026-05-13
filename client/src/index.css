@@ -381,8 +381,41 @@ body {
 
 /* ---- Filters ---- */
 .filter-section {
-  padding: 16px 20px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.filter-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filter-collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  color: var(--text-muted);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.filter-collapse-btn:hover {
+  color: var(--text);
+}
+
+.filter-collapse-chevron {
+  display: inline-block;
+  font-size: 18px;
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.filter-collapse-chevron.up {
+  transform: rotate(-90deg);
 }
 
 .filter-summary {
@@ -402,7 +435,7 @@ body {
 }
 
 .filter-group {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .filter-group:last-child {
@@ -893,27 +926,6 @@ body {
   font-family: 'DM Sans', sans-serif;
 }
 
-.sc-count {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 10px;
-  background: #c9a84c;
-  color: #0f1923;
-  font-size: 10px;
-  font-weight: 700;
-  font-family: 'DM Sans', sans-serif;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
-  border: 2px solid #fff;
-  pointer-events: auto;
-}
 
 /* ---- Connecting lines (rendered via L.canvas — no CSS needed) ---- */
 

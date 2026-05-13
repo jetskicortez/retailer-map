@@ -426,7 +426,7 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
 }
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
-export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef, radiusMiles }) {
+export function SmartClusterLayer({ children, onMarkerClick, onClusterClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef, radiusMiles }) {
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
@@ -542,6 +542,7 @@ export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propert
           );
 
           marker.on('click', () => {
+            if (onClusterClick) onClusterClick();
             if (cluster.items.length > 0 && onMarkerClick) {
               onMarkerClick(cluster.items[0].idx);
             }
@@ -674,7 +675,7 @@ export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propert
       map.off('moveend', debouncedRender);
       map.off('exportrender', onExportRender);
     };
-  }, [children, onMarkerClick, markerRefs, propertyLatLng, radiusMiles, map]);
+  }, [children, onMarkerClick, onClusterClick, markerRefs, propertyLatLng, radiusMiles, map]);
 
   return null;
 }

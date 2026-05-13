@@ -1231,6 +1231,8 @@ export default function App() {
                 idx: i,
                 name: r.name,
                 category: r.category,
+                address: r.address,
+                distanceMiles: r.distance_miles,
                 logoUrl: logoUrl || null,
                 popup: `<div class="popup-name">${escHtml(r.name)}${locationNote}</div>
                   <div class="popup-category" style="color:${escHtml(cfg.color)}">${cfg.emoji} ${escHtml(r.category)}</div>

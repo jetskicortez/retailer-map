@@ -330,12 +330,43 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
     }
   });
 
-  // Balance: if one side has way more, move some to the other
-  while (leftItems.length > rightItems.length + 2) {
+  // Rough count balance (within 3) to prevent extreme imbalance
+  while (leftItems.length > rightItems.length + 3) {
     rightItems.push(leftItems.pop());
   }
-  while (rightItems.length > leftItems.length + 2) {
+  while (rightItems.length > leftItems.length + 3) {
     leftItems.push(rightItems.pop());
+  }
+
+  // Height-based rebalancing: if one side overflows vertically, move items to the other.
+  // This handles cases where large cluster grids stack past the viewport bottom.
+  const usableColH = mapSize.y - 2 * MARGIN_Y;
+  function colTotalH(items) {
+    if (items.length === 0) return 0;
+    return items.reduce((s, c) => s + c.h, 0) + (items.length - 1) * GAP_Y;
+  }
+  for (let pass = 0; pass < 20; pass++) {
+    const lh = colTotalH(leftItems);
+    const rh = colTotalH(rightItems);
+    if (lh <= usableColH && rh <= usableColH) break;
+    if (lh > rh && leftItems.length > 1) {
+      const last = leftItems[leftItems.length - 1];
+      const newRh = rh + last.h + (rightItems.length > 0 ? GAP_Y : 0);
+      // Only move if it genuinely reduces the taller column and the other side can absorb it
+      if (newRh <= usableColH || newRh < lh) {
+        rightItems.push(leftItems.pop());
+        continue;
+      }
+    }
+    if (rh > lh && rightItems.length > 1) {
+      const last = rightItems[rightItems.length - 1];
+      const newLh = lh + last.h + (leftItems.length > 0 ? GAP_Y : 0);
+      if (newLh <= usableColH || newLh < rh) {
+        leftItems.push(rightItems.pop());
+        continue;
+      }
+    }
+    break;
   }
 
   // Sort each column by angle from property center.
@@ -509,8 +540,9 @@ export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propert
           if (!child) return;
 
           const marker = L.marker(markerLatLng, { icon: child.icon, draggable: true });
-          if (child.popup) marker.bindPopup(child.popup);
+          if (child.popup) marker.bindPopup(child.popup, { maxWidth: 260 });
           marker.on('click', () => {
+            marker.openPopup();
             if (onMarkerClick) onMarkerClick(item.idx);
           });
           marker.on('dragstart', () => { justDragged.current = true; });
@@ -533,15 +565,20 @@ export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propert
           }
           const marker = L.marker(markerLatLng, { icon, draggable: true });
 
-          const names = cluster.items.map((item) => {
-            return childByIdx.get(item.idx)?.name || '';
-          }).filter(Boolean);
+          const clusterChildren = cluster.items.map((item) => childByIdx.get(item.idx)).filter(Boolean);
+          const popupRows = clusterChildren.map((c) => {
+            const addr = c.address ? `<div class="popup-address">${c.address}</div>` : '';
+            const dist = c.distanceMiles != null ? `<div class="popup-distance">${c.distanceMiles.toFixed(1)} mi from property</div>` : '';
+            return `<div class="popup-cluster-item"><div class="popup-name" style="margin-bottom:2px">${c.name}</div>${addr}${dist}</div>`;
+          }).join('');
           marker.bindPopup(
-            `<div class="popup-name">${names.length} Retailers</div>` +
-            names.map((n) => `<div class="popup-address">${n}</div>`).join('')
+            `<div class="popup-cluster-header">${clusterChildren.length} Retailers</div>` +
+            `<div class="popup-cluster-list">${popupRows}</div>`,
+            { maxWidth: 260, maxHeight: 320 }
           );
 
           marker.on('click', () => {
+            marker.openPopup();
             if (cluster.items.length > 0 && onMarkerClick) {
               onMarkerClick(cluster.items[0].idx);
             }

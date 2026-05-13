@@ -808,8 +808,15 @@ body {
   justify-content: center;
   overflow: visible;
   padding: 8px;
-  cursor: grab;
+  cursor: pointer;
   position: relative;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.12s;
+}
+
+.logo-marker:hover {
+  border-color: rgba(201, 168, 76, 0.8);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 0 1.5px rgba(201,168,76,0.4);
+  transform: translateY(-2px);
 }
 
 .logo-count-badge {
@@ -878,12 +885,14 @@ body {
   border-radius: 6px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(201,168,76,0.12);
   position: relative;
-  cursor: grab;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s, transform 0.12s;
 }
 
 .smart-cluster:hover {
   border-color: rgba(201, 168, 76, 0.7);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(201,168,76,0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(201,168,76,0.35);
+  transform: translateY(-2px);
 }
 
 .sc-cell {
@@ -979,6 +988,35 @@ body {
   color: var(--gold);
   font-weight: 500;
   margin-top: 4px;
+}
+
+.popup-cluster-header {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+.popup-cluster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.popup-cluster-item {
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.popup-cluster-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 /* Leaflet zoom controls */

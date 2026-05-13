@@ -400,13 +400,19 @@ export default function App() {
     }
   }, []);
 
-  // Map marker click → highlight sidebar card, scroll into view
+  // Map marker click → highlight sidebar card, scroll into view, collapse filter
   const handleMarkerClick = useCallback((idx) => {
     setActiveIdx(idx);
+    setFilterCollapsed(true);
     const card = cardRefs.current[`c-${idx}`];
     if (card) {
       card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+  }, []);
+
+  // Cluster click → just collapse filter (zoom handled inside SmartClusterLayer)
+  const handleClusterClick = useCallback(() => {
+    setFilterCollapsed(true);
   }, []);
 
   // Fit all markers
@@ -1213,6 +1219,7 @@ export default function App() {
           {/* Retailer markers (smart clusters + collision avoidance) */}
           <SmartClusterLayer
             onMarkerClick={handleMarkerClick}
+            onClusterClick={handleClusterClick}
             markerRefs={markerRefs}
             propertyLatLng={data ? [data.property.lat, data.property.lng] : null}
             connectorDataRef={connectorDataRef}

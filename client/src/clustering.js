@@ -457,7 +457,7 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
 }
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
-export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef, radiusMiles }) {
+export function SmartClusterLayer({ children, onMarkerClick, onClusterClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef, radiusMiles }) {
   const map = useMap();
   const layerGroupRef = useRef(null);
   const linesGroupRef = useRef(null);
@@ -540,7 +540,7 @@ export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propert
           if (!child) return;
 
           const marker = L.marker(markerLatLng, { icon: child.icon, draggable: true });
-          if (child.popup) marker.bindPopup(child.popup, { maxWidth: 260 });
+          if (child.popup) marker.bindPopup(child.popup, { maxWidth: 260, autoPan: false });
           marker.on('click', () => {
             marker.openPopup();
             if (onMarkerClick) onMarkerClick(item.idx);
@@ -565,23 +565,10 @@ export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propert
           }
           const marker = L.marker(markerLatLng, { icon, draggable: true });
 
-          const clusterChildren = cluster.items.map((item) => childByIdx.get(item.idx)).filter(Boolean);
-          const popupRows = clusterChildren.map((c) => {
-            const addr = c.address ? `<div class="popup-address">${c.address}</div>` : '';
-            const dist = c.distanceMiles != null ? `<div class="popup-distance">${c.distanceMiles.toFixed(1)} mi from property</div>` : '';
-            return `<div class="popup-cluster-item"><div class="popup-name" style="margin-bottom:2px">${c.name}</div>${addr}${dist}</div>`;
-          }).join('');
-          marker.bindPopup(
-            `<div class="popup-cluster-header">${clusterChildren.length} Retailers</div>` +
-            `<div class="popup-cluster-list">${popupRows}</div>`,
-            { maxWidth: 260, maxHeight: 320 }
-          );
-
           marker.on('click', () => {
-            marker.openPopup();
-            if (cluster.items.length > 0 && onMarkerClick) {
-              onMarkerClick(cluster.items[0].idx);
-            }
+            const targetZoom = Math.min(map.getZoom() + 2, 18);
+            map.flyTo(cluster.centroidLatLng, targetZoom, { duration: 0.45 });
+            if (onClusterClick) onClusterClick();
           });
           marker.on('dragstart', () => { justDragged.current = true; });
           marker.on('dragend', (e) => {
@@ -711,7 +698,7 @@ export function SmartClusterLayer({ children, onMarkerClick, markerRefs, propert
       map.off('moveend', debouncedRender);
       map.off('exportrender', onExportRender);
     };
-  }, [children, onMarkerClick, markerRefs, propertyLatLng, radiusMiles, map]);
+  }, [children, onMarkerClick, onClusterClick, markerRefs, propertyLatLng, radiusMiles, map]);
 
   return null;
 }

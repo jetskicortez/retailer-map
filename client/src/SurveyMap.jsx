@@ -231,7 +231,9 @@ export default function SurveyMap() {
 
   // Retailer state
   const [retailers, setRetailers] = useState([]);
-  const [showRetailers, setShowRetailers] = useState(false);
+  // Auto-enable the retailer layer when launched with ?retailers=1 (used by the
+  // automated OM capture so retailer pins render without a manual toggle).
+  const [showRetailers, setShowRetailers] = useState(urlParams.get('retailers') === '1');
   const [retailersLoading, setRetailersLoading] = useState(false);
   const [activeCategories, setActiveCategories] = useState(new Set());
   const [activeChainSizes, setActiveChainSizes] = useState(new Set());

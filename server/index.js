@@ -10,6 +10,11 @@ if (process.env.VERCEL !== '1') {
   dotenv.config({ path: resolve(__dirname, '..', '.env'), override: true });
 }
 
+// Google API key for Geocoding + Places. Prefer GOOGLE_PLACES_API_KEY (a
+// dedicated, unrestricted server key); fall back to GOOGLE_MAPS_API_KEY for
+// existing prod/Vercel config.
+const GOOGLE_KEY = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+
 const app = express();
 const PORT = 3001;
 
@@ -55,7 +60,7 @@ app.post('/api/claude', async (req, res) => {
 
 // ── Geocode via Google Maps Geocoding API ─────────────────────────
 async function geocodeAddress(address) {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const apiKey = GOOGLE_KEY;
   if (!apiKey || apiKey === 'YOUR_KEY_HERE') return null;
 
   const url = `https://maps.googleapis.com/maps/api/geocode/json?${new URLSearchParams({
@@ -508,9 +513,9 @@ async function textSearchPlaces(query, lat, lng, radiusMeters, apiKey) {
 }
 
 app.post('/api/places-nearby', async (req, res) => {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  const apiKey = GOOGLE_KEY;
   if (!apiKey || apiKey === 'YOUR_KEY_HERE') {
-    return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY not configured' });
+    return res.status(500).json({ error: 'Google API key not configured (set GOOGLE_PLACES_API_KEY)' });
   }
 
   try {

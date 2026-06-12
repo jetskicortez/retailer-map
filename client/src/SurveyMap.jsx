@@ -265,22 +265,33 @@ export default function SurveyMap() {
     setSurveyTitle(data.title);
 
     try {
-      const addresses = data.properties.map(p => p.address);
-      const geoRes = await fetch('/api/geocode-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addresses }),
+      // Honor coordinates already supplied in the payload (e.g. Stella geocodes
+      // upstream and passes lat/lng). Only call the backend geocoder for
+      // properties missing coordinates — so the map still renders even when the
+      // local backend has no GOOGLE_MAPS_API_KEY.
+      const hasCoords = (p) =>
+        Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng));
+      const toGeocode = data.properties.filter(p => !hasCoords(p));
+
+      let geoResults = [];
+      if (toGeocode.length > 0) {
+        const geoRes = await fetch('/api/geocode-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ addresses: toGeocode.map(p => p.address) }),
+        });
+        if (!geoRes.ok) throw new Error('Geocoding failed');
+        geoResults = await geoRes.json();
+      }
+
+      let gi = 0;
+      const enriched = data.properties.map((p) => {
+        if (hasCoords(p)) {
+          return { ...p, lat: Number(p.lat), lng: Number(p.lng), geocoded: true };
+        }
+        const g = geoResults[gi++];
+        return { ...p, lat: g?.lat || null, lng: g?.lng || null, geocoded: !!(g?.lat) };
       });
-
-      if (!geoRes.ok) throw new Error('Geocoding failed');
-      const geoResults = await geoRes.json();
-
-      const enriched = data.properties.map((p, i) => ({
-        ...p,
-        lat: geoResults[i]?.lat || null,
-        lng: geoResults[i]?.lng || null,
-        geocoded: !!(geoResults[i]?.lat),
-      }));
 
       const valid = enriched.filter(p => p.geocoded);
       if (valid.length === 0) throw new Error('Could not geocode any property addresses.');

@@ -11,8 +11,8 @@ import 'leaflet/dist/leaflet.css';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { createRecommendedIcon, createNumberedIcon } from './surveyMarkers.js';
-import { getLogoUrl, preloadLogo, createLogoIcon } from './logos.js';
-import { getCategoryConfig, createRetailerIcon, SmartClusterLayer } from './clustering.js';
+import { getLogoUrl, preloadLogo, createLogoIcon, createTextLogoIcon } from './logos.js';
+import { getCategoryConfig, SmartClusterLayer } from './clustering.js';
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 3958.8;
@@ -235,6 +235,7 @@ export default function SurveyMap() {
   // automated OM capture so retailer pins render without a manual toggle).
   const [showRetailers, setShowRetailers] = useState(urlParams.get('retailers') === '1');
   const [retailersLoading, setRetailersLoading] = useState(false);
+  const [retailerSearchRadius, setRetailerSearchRadius] = useState(1);
   const [activeCategories, setActiveCategories] = useState(new Set());
   const [activeChainSizes, setActiveChainSizes] = useState(new Set());
   const [retailerAccordionOpen, setRetailerAccordionOpen] = useState(false);
@@ -387,6 +388,7 @@ export default function SurveyMap() {
         if (d > maxDist) maxDist = d;
       }
       const searchRadius = Math.min(Math.max(Math.ceil(maxDist + 1), 1), 5);
+      setRetailerSearchRadius(searchRadius);
 
       try {
         const res = await fetch('/api/places-nearby', {
@@ -402,6 +404,7 @@ export default function SurveyMap() {
 
         if (!res.ok) throw new Error('Retailer search failed');
         const data = await res.json();
+        if (data.radiusMiles) setRetailerSearchRadius(data.radiusMiles);
         setRetailers(data.retailers || []);
 
         // Preload retailer logos
@@ -470,6 +473,17 @@ export default function SurveyMap() {
       return true;
     });
   }, [retailers, activeCategories, activeChainSizes, showRetailers]);
+
+  useEffect(() => {
+    window.__surveyRetailerState = {
+      showRetailers,
+      loading: retailersLoading,
+      total: retailers.length,
+      filtered: filteredRetailers.length,
+      radiusMiles: retailerSearchRadius,
+    };
+    return () => { window.__surveyRetailerState = null; };
+  }, [showRetailers, retailersLoading, retailers.length, filteredRetailers.length, retailerSearchRadius]);
 
   const availableCategories = useMemo(() => {
     if (retailers.length === 0) return [];
@@ -1079,14 +1093,14 @@ export default function SurveyMap() {
             propertyLatLng={center}
             connectorDataRef={connectorDataRef}
             isExportingRef={isExportingRef}
-            radiusMiles={2}
+            radiusMiles={retailerSearchRadius}
           >
             {filteredRetailers.map((r, i) => {
               const cfg = getCategoryConfig(r.category);
               const logoUrl = getLogoUrl(r.name);
               return {
                 position: [r.lat, r.lng],
-                icon: logoUrl ? createLogoIcon(logoUrl, r.name) : createRetailerIcon(r.category),
+                icon: logoUrl ? createLogoIcon(logoUrl, r.name) : createTextLogoIcon(r.name),
                 idx: i,
                 name: r.name,
                 category: r.category,

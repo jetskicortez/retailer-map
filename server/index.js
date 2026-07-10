@@ -300,6 +300,7 @@ const NATIONAL_BRANDS = new Set([
   "Applebee's", "Applebee's Grill + Bar", "Chili's", "Chili's Grill & Bar",
   'Olive Garden', 'Red Lobster', 'Outback Steakhouse', 'Cracker Barrel',
   'Cracker Barrel Old Country Store', "Denny's", 'IHOP', 'TGI Fridays',
+  'Dairy Queen', 'DQ Grill & Chill', 'DQ Grill & Chill Restaurant',
   "Buffalo Wild Wings", 'Golden Corral', 'Texas Roadhouse', 'LongHorn Steakhouse',
   'Red Robin', 'Red Robin Gourmet Burgers', "Bob Evans", "Bob Evans Restaurant",
   "Waffle House", "Perkins", "Perkins Restaurant & Bakery", "Panera Bread", "Panera",
@@ -321,7 +322,8 @@ const NATIONAL_BRANDS = new Set([
   'AutoZone', 'Advance Auto Parts', "O'Reilly Auto Parts", 'NAPA Auto Parts',
   'Jiffy Lube', 'Valvoline Instant Oil Change', 'Valvoline', 'Midas', 'Firestone',
   'Firestone Complete Auto Care', 'Pep Boys', 'Maaco', 'Meineke', 'Goodyear',
-  'Goodyear Auto Service', 'Discount Tire', 'Les Schwab',
+  'Goodyear Auto Service', 'Goodyear Commercial Tire & Service Centers',
+  'Discount Tire', 'Les Schwab', 'Mr. Tire', 'Mr. Tire Auto Service Centers',
   // Department Store / Big Box
   'Kohl\'s', "Kohl's", 'JCPenney', 'Macy\'s', "Macy's", 'Nordstrom', 'Nordstrom Rack',
   'TJ Maxx', 'TJMaxx', 'T.J. Maxx', 'Marshalls', 'Ross', 'Ross Dress for Less',
@@ -338,10 +340,12 @@ const NATIONAL_BRANDS = new Set([
   'Sheetz', 'Wawa', '7-Eleven', 'Circle K', 'QuikTrip', 'QT', 'Speedway',
   'Casey\'s', "Casey's General Store", 'Pilot Flying J', 'RaceTrac', 'Buc-ee\'s',
   "Buc-ee's", 'GetGo', 'Kum & Go', 'Kwik Trip', 'Thorntons', 'Mapco',
-  'Shell', 'BP', 'ExxonMobil', 'Chevron', 'Sunoco', 'Marathon',
+  'Shell', 'BP', 'bp', 'ExxonMobil', 'Chevron', 'Sunoco', 'Marathon',
   // Entertainment
   'AMC Theatres', 'AMC', 'Regal Cinemas', 'Regal', 'Cinemark', 'Dave & Buster\'s',
   "Dave & Buster's", 'Chuck E. Cheese', 'Topgolf', 'Main Event',
+  // Hotels / travel demand drivers
+  'Holiday Inn Express', 'Holiday Inn Express by IHG',
   // Specialty Retail
   'Bed Bath & Beyond', 'Bath & Body Works', 'Ulta Beauty', 'Ulta', 'Sephora',
   'Sally Beauty', 'GNC', 'Vitamin Shoppe', 'The Vitamin Shoppe',
@@ -354,10 +358,17 @@ const NATIONAL_BRANDS = new Set([
 ]);
 
 function classifyChainSize(name) {
-  if (NATIONAL_BRANDS.has(name)) return 'National';
+  const normalizedName = String(name || '').trim().toLowerCase();
+  if (!normalizedName) return 'Regional/Local';
+
   // Check partial matches for brands with location suffixes
   for (const brand of NATIONAL_BRANDS) {
-    if (name.startsWith(brand) || brand.startsWith(name)) return 'National';
+    const normalizedBrand = brand.toLowerCase();
+    if (normalizedName === normalizedBrand ||
+        normalizedName.startsWith(normalizedBrand) ||
+        normalizedBrand.startsWith(normalizedName)) {
+      return 'National';
+    }
   }
   return 'Regional/Local';
 }
@@ -524,7 +535,20 @@ app.post('/api/places-nearby', async (req, res) => {
       return res.status(400).json({ error: 'lat and lng are required' });
     }
 
-    const radiusMi = parseFloat(radiusMiles) || 3;
+    // Auto-widen: sparse corridors (rural Route 30 etc.) can have almost no
+    // national retailers within 1 mile. Retry at 2 then 3 miles until the map
+    // has enough national brands to tell a retail story. Response reports the
+    // radius actually used so clients can draw the ring honestly.
+    const requestedRadius = parseFloat(radiusMiles) || 3;
+    const MIN_NATIONALS = 20; // ponytail: tuned so sparse corridors widen to the nearest anchor cluster; drop if maps feel too zoomed-out
+    const radiusLadder = [...new Set([requestedRadius, 2, 3])]
+      .filter((r) => r >= requestedRadius)
+      .sort((a, b) => a - b);
+    let finalRetailers = [];
+    let effectiveRadius = requestedRadius;
+
+    for (const radiusMi of radiusLadder) {
+    effectiveRadius = radiusMi;
     const radiusMeters = radiusMi * 1609.34;
     const minRatingCount = 30; // Lowered from 50 to catch chains in smaller markets
 
@@ -671,9 +695,16 @@ app.post('/api/places-nearby', async (req, res) => {
 
     console.log(`Found ${unique.length} unique places, ${filtered.length} after filtering, ${retailers.length} within ${radiusMi}mi radius`);
 
+    finalRetailers = retailers;
+    const nationalCount = retailers.filter((r) => r.chainSize === 'National').length;
+    if (nationalCount >= MIN_NATIONALS) break;
+    console.log(`Only ${nationalCount} national retailers at ${radiusMi}mi — widening search`);
+    } // end radius ladder
+
     res.json({
       property: { lat, lng, display: propertyAddress || `${lat}, ${lng}` },
-      retailers,
+      radiusMiles: effectiveRadius,
+      retailers: finalRetailers,
     });
   } catch (err) {
     console.error('Places nearby error:', err);

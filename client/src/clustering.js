@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { getLogoUrl, getFallbackLogoUrl, createLogoIcon, getLogoMarkerW, LOGO_H, LOGO_MIN_W } from './logos.js';
+import { getLogoUrl, getFallbackLogoUrl, createLogoIcon, getLogoMarkerW, LOGO_H, LOGO_MIN_W, escapeHtml } from './logos.js';
 
 // ── Category config (shared) ─────────────────────────────────────
 export const CATEGORIES = {
@@ -214,8 +214,10 @@ export function createClusterGridIcon(cluster, childrenData) {
     const child = childrenData.find((c) => c && c.idx === item.idx);
     if (!child) return '<div class="sc-cell"></div>';
     const logoUrl = child.logoUrl;
-    const name = (child.name || '').replace(/'/g, "\\'");
-    const shortName = name.length > 10 ? name.substring(0, 9) + '\u2026' : name;
+    // escapeHtml (not JS-string escaping) \u2014 this text renders as HTML, and
+    // &#39; keeps apostrophes safe inside the single-quoted onerror strings too.
+    const rawName = child.name || '';
+    const shortName = escapeHtml(rawName.length > 10 ? rawName.substring(0, 9) + '\u2026' : rawName);
     if (logoUrl) {
       const cellFb = child.name ? getFallbackLogoUrl(child.name) : null;
       // On error: try BrandFetch fallback, then show brand name text

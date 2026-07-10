@@ -13,18 +13,21 @@ const address = process.argv[2];
 const outputPath = process.argv[3];
 
 if (!address || !outputPath) {
-  console.error('Usage: node capture-map.mjs "Address" "output/path.png" [--traffic-vpd 32000] [--traffic-road "Road Name"]');
+  console.error('Usage: node capture-map.mjs "Address" "output/path.png" [--traffic-vpd 32000] [--traffic-road "Road Name"] [--satellite]');
   process.exit(1);
 }
 
-// Parse optional traffic flags from remaining args
+// Parse optional flags from remaining args
 let trafficVpd = '';
 let trafficRoad = '';
+let satellite = false;
 for (let i = 4; i < process.argv.length; i++) {
   if (process.argv[i] === '--traffic-vpd' && process.argv[i + 1]) {
     trafficVpd = process.argv[++i];
   } else if (process.argv[i] === '--traffic-road' && process.argv[i + 1]) {
     trafficRoad = process.argv[++i];
+  } else if (process.argv[i] === '--satellite') {
+    satellite = true;
   }
 }
 
@@ -35,6 +38,7 @@ const APP_BASE_URL = process.env.RETAILER_MAP_BASE_URL || 'https://retailer-map.
 const pageUrlParams = new URLSearchParams();
 if (trafficVpd) pageUrlParams.set('traffic_vpd', trafficVpd);
 if (trafficRoad) pageUrlParams.set('traffic_road', trafficRoad);
+if (satellite) pageUrlParams.set('style', 'satellite');
 const APP_URL = pageUrlParams.toString()
   ? `${APP_BASE_URL}?${pageUrlParams.toString()}`
   : APP_BASE_URL;

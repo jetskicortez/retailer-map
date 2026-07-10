@@ -701,7 +701,7 @@ export function createLogoIcon(logoUrl, retailerName, count = 1) {
   });
 }
 
-function escapeHtml(value) {
+export function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

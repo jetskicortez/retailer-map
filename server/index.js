@@ -718,9 +718,65 @@ app.post('/api/places-nearby', async (req, res) => {
 const logoCache = new Map(); // domain -> { buffer, contentType, timestamp }
 const LOGO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+// BrandFetch serves the SAME generic placeholder image (HTTP 200) for every
+// unknown domain, so byte-size checks can't catch it. Self-calibrate: fetch
+// what BrandFetch returns for a domain that cannot exist and reject any logo
+// response whose hash matches. Lazy + cached for the process lifetime.
+import { createHash } from 'crypto';
+let placeholderHashesPromise = null;
+function hashBuffer(buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
+}
+async function getPlaceholderHashes() {
+  if (!placeholderHashesPromise) {
+    placeholderHashesPromise = (async () => {
+      // Two unrelated brands can never share a real logo, so any hash that
+      // appears for BOTH calibration domains is a generic placeholder.
+      // (Bogus domains get a different tiny response, so they can't be used
+      // to calibrate — BrandFetch only serves the generic for real domains.)
+      const calibrationDomains = ['mcdonalds.com', 'chase.com'];
+      const perDomain = [];
+      for (const domain of calibrationDomains) {
+        const hashes = new Set();
+        for (const url of brandfetchUrls(domain)) {
+          try {
+            const response = await fetch(url, { redirect: 'follow', headers: BRANDFETCH_HEADERS });
+            const contentType = response.headers.get('content-type') || '';
+            if (response.ok && contentType.includes('image')) {
+              hashes.add(hashBuffer(Buffer.from(await response.arrayBuffer())));
+            }
+          } catch { /* offline or blocked — no calibration, no filtering */ }
+        }
+        perDomain.push(hashes);
+      }
+      return new Set([...perDomain[0]].filter(h => perDomain[1].has(h)));
+    })();
+  }
+  return placeholderHashesPromise;
+}
+
+const BRANDFETCH_HEADERS = {
+  'Referer': 'https://thecolonyagency.com/',
+  'Origin': 'https://thecolonyagency.com',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  'Accept': 'image/png,image/webp,image/*,*/*',
+};
+
+function brandfetchUrls(domain) {
+  const clientId = '1idmdqs82nFxq8ItTXO';
+  return [
+    `https://cdn.brandfetch.io/${domain}/theme/light/symbol.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/light/icon.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/dark/symbol.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/dark/icon.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/icon.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/theme/light/logo.png?c=${clientId}`,
+    `https://cdn.brandfetch.io/${domain}/logo.png?c=${clientId}`,
+  ];
+}
+
 app.get('/api/logo/:domain', async (req, res) => {
   const { domain } = req.params;
-  const clientId = '1idmdqs82nFxq8ItTXO';
 
   // Check cache
   const cached = logoCache.get(domain);
@@ -730,28 +786,12 @@ app.get('/api/logo/:domain', async (req, res) => {
     return res.send(cached.buffer);
   }
 
-  // Try BrandFetch URL patterns: square icons first, wordmark logo as last resort.
-  const urls = [
-    `https://cdn.brandfetch.io/${domain}/theme/light/symbol.png?c=${clientId}`,
-    `https://cdn.brandfetch.io/${domain}/theme/light/icon.png?c=${clientId}`,
-    `https://cdn.brandfetch.io/${domain}/theme/dark/symbol.png?c=${clientId}`,
-    `https://cdn.brandfetch.io/${domain}/theme/dark/icon.png?c=${clientId}`,
-    `https://cdn.brandfetch.io/${domain}/icon.png?c=${clientId}`,
-    `https://cdn.brandfetch.io/${domain}/theme/light/logo.png?c=${clientId}`,
-    `https://cdn.brandfetch.io/${domain}/logo.png?c=${clientId}`,
-  ];
+  const placeholderHashes = await getPlaceholderHashes();
 
-  for (const url of urls) {
+  // Try BrandFetch URL patterns: square icons first, wordmark logo as last resort.
+  for (const url of brandfetchUrls(domain)) {
     try {
-      const response = await fetch(url, {
-        redirect: 'follow',
-        headers: {
-          'Referer': 'https://thecolonyagency.com/',
-          'Origin': 'https://thecolonyagency.com',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'image/png,image/webp,image/*,*/*',
-        },
-      });
+      const response = await fetch(url, { redirect: 'follow', headers: BRANDFETCH_HEADERS });
 
       const contentType = response.headers.get('content-type') || '';
       if (response.ok && contentType.includes('image')) {
@@ -759,6 +799,9 @@ app.get('/api/logo/:domain', async (req, res) => {
         // Brandfetch sometimes returns a tiny blank/transparent PNG for unknown domains.
         // Anything under 300 bytes is not a real logo — skip it and try the next pattern.
         if (buffer.length < 300) continue;
+        // A 200 that matches the calibrated unknown-domain placeholder is not a
+        // real logo either — returning it paints blank tiles on OM exports.
+        if (placeholderHashes.has(hashBuffer(buffer))) continue;
         logoCache.set(domain, { buffer, contentType, timestamp: Date.now() });
         res.set('Content-Type', contentType);
         res.set('Cache-Control', 'public, max-age=86400');

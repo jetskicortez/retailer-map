@@ -362,6 +362,12 @@ export default function App() {
         throw new Error('No retailers found within the search radius. Try increasing the radius.');
       }
 
+      // Server may have auto-widened the search in sparse markets — adopt the
+      // effective radius so the ring and its label reflect what was searched.
+      if (parsed.radiusMiles && parsed.radiusMiles !== parseFloat(radius)) {
+        setRadius(String(parsed.radiusMiles));
+      }
+
       // Preload all logo images so we know their dimensions for dynamic sizing
       const logoUrls = parsed.retailers
         .map((r) => getLogoUrl(r.name))

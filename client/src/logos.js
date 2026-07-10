@@ -270,6 +270,7 @@ export const LOGO_FILES = {
   'aarons': 'Aarons.png',
   "aaron's": 'Aarons.png',
   'ace hardware': 'Ace Hardware.png',
+  'advance auto parts': 'Advance Auto Parts.png',
   'anytime fitness': 'Anytime Fitness.png',
   "arby's": 'Arbys.png',
   'arbys': 'Arbys.png',
@@ -624,11 +625,13 @@ export function _resolveName(normalized) {
 
 export function getLogoUrl(retailerName) {
   const normalized = retailerName.toLowerCase().trim();
-  const { file } = _resolveName(normalized);
-  // Primary markers use only checked-in logo assets. Remote logo fetches are
-  // still available as fallbacks for broken local files, but remote-only brands
-  // render as text tiles so exports never contain blank logo boxes.
-  return file ? `/logos/${file}` : null;
+  const { domain, file } = _resolveName(normalized);
+  if (!domain && !file) return null;
+  // Local logos (212+ PNGs) as primary — reliable, no API dependency.
+  // BrandFetch proxy (/api/logo/:domain) as secondary for known brands without
+  // a checked-in PNG. Brands with neither render as text tiles (last resort)
+  // so exports never contain blank logo boxes.
+  return file ? `/logos/${file}` : `/api/logo/${domain}`;
 }
 
 // Get BrandFetch proxy fallback URL for onerror handling (when local logo fails)
@@ -684,9 +687,10 @@ export function createLogoIcon(logoUrl, retailerName, count = 1) {
   const fallbackHtml = `${badge}<span class=logo-marker-fallback-text>${escapeHtml(shortenRetailerName(retailerName))}</span>`;
   const fallbackJs = escapeJsString(fallbackHtml);
 
-  const errorHandler = fallback && fallback !== logoUrl
+  const errorHandler = (fallback && fallback !== logoUrl
     ? `this.onerror=function(){this.onerror=null;this.parentElement.innerHTML='${fallbackJs}'};this.src='${fallback}'`
-    : `this.onerror=null;this.parentElement.innerHTML='${fallbackJs}'`;
+    : `this.onerror=null;this.parentElement.innerHTML='${fallbackJs}'`
+  ).replace(/"/g, '&quot;'); // fallback HTML carries double quotes — must not terminate the onerror attribute
 
   return L.divIcon({
     html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;">${badge}<img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="${errorHandler}" /></div>`,
@@ -715,6 +719,8 @@ function escapeJsString(value) {
 
 function shortenRetailerName(name) {
   return String(name || 'Retailer')
+    .replace(/\s*\([^)]*\)/g, '')          // location qualifiers: "(PA Tpk Exit 67)"
+    .replace(/\s+by\s+[A-Z][\w&' ]*$/, '') // franchise suffixes: "by IHG"
     .replace(/\s+Inc\.?$/i, '')
     .replace(/\s+LLC\.?$/i, '')
     .replace(/\s+Restaurant$/i, '')

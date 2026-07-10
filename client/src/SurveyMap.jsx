@@ -404,6 +404,7 @@ export default function SurveyMap() {
 
         if (!res.ok) throw new Error('Retailer search failed');
         const data = await res.json();
+        if (data.radiusMiles) setRetailerSearchRadius(data.radiusMiles);
         setRetailers(data.retailers || []);
 
         // Preload retailer logos

@@ -535,7 +535,20 @@ app.post('/api/places-nearby', async (req, res) => {
       return res.status(400).json({ error: 'lat and lng are required' });
     }
 
-    const radiusMi = parseFloat(radiusMiles) || 3;
+    // Auto-widen: sparse corridors (rural Route 30 etc.) can have almost no
+    // national retailers within 1 mile. Retry at 2 then 3 miles until the map
+    // has enough national brands to tell a retail story. Response reports the
+    // radius actually used so clients can draw the ring honestly.
+    const requestedRadius = parseFloat(radiusMiles) || 3;
+    const MIN_NATIONALS = 20; // ponytail: tuned so sparse corridors widen to the nearest anchor cluster; drop if maps feel too zoomed-out
+    const radiusLadder = [...new Set([requestedRadius, 2, 3])]
+      .filter((r) => r >= requestedRadius)
+      .sort((a, b) => a - b);
+    let finalRetailers = [];
+    let effectiveRadius = requestedRadius;
+
+    for (const radiusMi of radiusLadder) {
+    effectiveRadius = radiusMi;
     const radiusMeters = radiusMi * 1609.34;
     const minRatingCount = 30; // Lowered from 50 to catch chains in smaller markets
 
@@ -682,9 +695,16 @@ app.post('/api/places-nearby', async (req, res) => {
 
     console.log(`Found ${unique.length} unique places, ${filtered.length} after filtering, ${retailers.length} within ${radiusMi}mi radius`);
 
+    finalRetailers = retailers;
+    const nationalCount = retailers.filter((r) => r.chainSize === 'National').length;
+    if (nationalCount >= MIN_NATIONALS) break;
+    console.log(`Only ${nationalCount} national retailers at ${radiusMi}mi — widening search`);
+    } // end radius ladder
+
     res.json({
       property: { lat, lng, display: propertyAddress || `${lat}, ${lng}` },
-      retailers,
+      radiusMiles: effectiveRadius,
+      retailers: finalRetailers,
     });
   } catch (err) {
     console.error('Places nearby error:', err);

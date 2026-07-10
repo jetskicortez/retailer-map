@@ -10,8 +10,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { RETAILER_DOMAINS, LOGO_FILES, getLogoUrl, getFallbackLogoUrl, preloadLogo, getLogoMarkerW, createLogoIcon, LOGO_H, LOGO_MIN_W, LOGO_MAX_W } from './logos.js';
-import { CATEGORIES, getCategoryConfig, createRetailerIcon, MARKER_PAD, SmartClusterLayer } from './clustering.js';
+import { RETAILER_DOMAINS, LOGO_FILES, getLogoUrl, getFallbackLogoUrl, preloadLogo, getLogoMarkerW, createLogoIcon, createTextLogoIcon, LOGO_H, LOGO_MIN_W, LOGO_MAX_W } from './logos.js';
+import { CATEGORIES, getCategoryConfig, MARKER_PAD, SmartClusterLayer } from './clustering.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
 function escHtml(str) {
@@ -1248,7 +1248,7 @@ export default function App() {
               const locationNote = count > 1 ? ` <span style="color:#c9a84c">(${count} locations)</span>` : '';
               return {
                 position: [r.lat, r.lng],
-                icon: logoUrl ? createLogoIcon(logoUrl, r.name, count) : createRetailerIcon(r.category),
+                icon: logoUrl ? createLogoIcon(logoUrl, r.name, count) : createTextLogoIcon(r.name, count),
                 idx: i,
                 name: r.name,
                 category: r.category,

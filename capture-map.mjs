@@ -29,7 +29,7 @@ for (let i = 4; i < process.argv.length; i++) {
 }
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const APP_BASE_URL = 'https://retailer-map.vercel.app';
+const APP_BASE_URL = process.env.RETAILER_MAP_BASE_URL || 'https://retailer-map.vercel.app';
 
 // Build page URL — append traffic params if provided so the badge renders on load
 const pageUrlParams = new URLSearchParams();

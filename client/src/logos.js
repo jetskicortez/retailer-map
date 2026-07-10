@@ -22,10 +22,14 @@ export const RETAILER_DOMAINS = {
   'jpmorgan chase': 'chase.com',
   'the cheesecake factory': 'thecheesecakefactory.com',
   'cheesecake factory': 'thecheesecakefactory.com',
+  'copart': 'copart.com',
   'cracker barrel': 'crackerbarrel.com',
   'cracker barrel old country store': 'crackerbarrel.com',
   'cricket wireless': 'cricketwireless.com',
   'dairy queen': 'dairyqueen.com',
+  'dairy queen grill & chill': 'dairyqueen.com',
+  'dq grill & chill': 'dairyqueen.com',
+  'dq grill & chill restaurant': 'dairyqueen.com',
   "denny's": 'dennys.com',
   'dennys': 'dennys.com',
   'dollar general': 'dollargeneral.com',
@@ -42,6 +46,7 @@ export const RETAILER_DOMAINS = {
   "gabe's": 'gabes.com',
   'gabes': 'gabes.com',
   'goodwill': 'goodwill.org',
+  'goodyear commercial tire & service centers': 'goodyear.com',
   'h&r block': 'hrblock.com',
   'hr block': 'hrblock.com',
   'harbor freight': 'harborfreight.com',
@@ -49,6 +54,7 @@ export const RETAILER_DOMAINS = {
   'hobby lobby': 'hobbylobby.com',
   'home depot': 'homedepot.com',
   'the home depot': 'homedepot.com',
+  'holiday inn express': 'ihg.com',
   'huntington bank': 'huntington.com',
   'ihop': 'ihop.com',
   "jimmy john's": 'jimmyjohns.com',
@@ -65,6 +71,10 @@ export const RETAILER_DOMAINS = {
   'moes grill': 'moes.com',
   "ollie's bargain outlet": 'ollies.us',
   'ollies': 'ollies.us',
+  'mr. tire': 'mrtire.com',
+  'mr tire': 'mrtire.com',
+  'mr. tire auto service centers': 'mrtire.com',
+  'mr tire auto service centers': 'mrtire.com',
   'pnc': 'pnc.com',
   'pnc bank': 'pnc.com',
   'panda express': 'pandaexpress.com',
@@ -292,6 +302,9 @@ export const LOGO_FILES = {
   'cracker barrel old country store': 'Cracker Barrel.png',
   'cricket wireless': 'Cricket Wireless.png',
   'dairy queen': 'Dairy Queen.png',
+  'dairy queen grill & chill': 'Dairy Queen.png',
+  'dq grill & chill': 'Dairy Queen.png',
+  'dq grill & chill restaurant': 'Dairy Queen.png',
   "denny's": 'Dennys.png',
   'dennys': 'Dennys.png',
   "dick's sporting goods": 'Dicks Sporting Goods.png',
@@ -320,6 +333,7 @@ export const LOGO_FILES = {
   'goodwill': 'Goodwill.png',
   'goodyear': 'Goodyear.png',
   'goodyear auto service': 'Goodyear.png',
+  'goodyear commercial tire & service centers': 'Goodyear.png',
   'h&r block': 'HR Block.png',
   'hr block': 'HR Block.png',
   'harbor freight': 'Harbor Freight.png',
@@ -610,14 +624,11 @@ export function _resolveName(normalized) {
 
 export function getLogoUrl(retailerName) {
   const normalized = retailerName.toLowerCase().trim();
-  const { domain, file } = _resolveName(normalized);
-  if (!domain && !file) return null;
-  const localUrl = file ? `/logos/${file}` : null;
-  // Local logos (212+ PNGs) as primary — reliable, no API dependency
-  // BrandFetch proxy at /api/logo/:domain available as fallback
-  // (requires registered domain origin to return real images)
-  const brandfetchUrl = domain ? `/api/logo/${domain}` : null;
-  return localUrl || brandfetchUrl;
+  const { file } = _resolveName(normalized);
+  // Primary markers use only checked-in logo assets. Remote logo fetches are
+  // still available as fallbacks for broken local files, but remote-only brands
+  // render as text tiles so exports never contain blank logo boxes.
+  return file ? `/logos/${file}` : null;
 }
 
 // Get BrandFetch proxy fallback URL for onerror handling (when local logo fails)
@@ -667,16 +678,56 @@ export function createLogoIcon(logoUrl, retailerName, count = 1) {
   const innerW = markerW - 19;
   const innerH = LOGO_H - 19;
 
-  // Build onerror: try BrandFetch fallback (since local is primary now), then hide
+  // Try BrandFetch once, then fall back to a readable text tile.
   const fallback = retailerName ? getFallbackLogoUrl(retailerName) : null;
-  const onerror = fallback
-    ? `this.onerror=function(){this.style.display='none'};this.src='${fallback}'`
-    : "this.style.display='none'";
+  const badge = count > 1 ? `<div class="logo-count-badge">${count}</div>` : '';
+  const fallbackHtml = `${badge}<span class=logo-marker-fallback-text>${escapeHtml(shortenRetailerName(retailerName))}</span>`;
+  const fallbackJs = escapeJsString(fallbackHtml);
 
+  const errorHandler = fallback && fallback !== logoUrl
+    ? `this.onerror=function(){this.onerror=null;this.parentElement.innerHTML='${fallbackJs}'};this.src='${fallback}'`
+    : `this.onerror=null;this.parentElement.innerHTML='${fallbackJs}'`;
+
+  return L.divIcon({
+    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;">${badge}<img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="${errorHandler}" /></div>`,
+    className: '',
+    iconSize: [markerW, LOGO_H],
+    iconAnchor: [markerW / 2, LOGO_H / 2],
+    popupAnchor: [0, -LOGO_H / 2],
+  });
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeJsString(value) {
+  return String(value || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r?\n/g, ' ');
+}
+
+function shortenRetailerName(name) {
+  return String(name || 'Retailer')
+    .replace(/\s+Inc\.?$/i, '')
+    .replace(/\s+LLC\.?$/i, '')
+    .replace(/\s+Restaurant$/i, '')
+    .trim();
+}
+
+export function createTextLogoIcon(retailerName, count = 1) {
+  const label = shortenRetailerName(retailerName);
+  const markerW = Math.max(78, Math.min(LOGO_MAX_W, Math.round(label.length * 6.2 + 28)));
   const badge = count > 1 ? `<div class="logo-count-badge">${count}</div>` : '';
 
   return L.divIcon({
-    html: `<div class="logo-marker" style="width:${markerW}px;height:${LOGO_H}px;">${badge}<img src="${logoUrl}" alt="" width="${innerW}" height="${innerH}" style="object-fit:contain;" onerror="${onerror}" /></div>`,
+    html: `<div class="logo-marker logo-marker-text" style="width:${markerW}px;height:${LOGO_H}px;">${badge}<span>${escapeHtml(label)}</span></div>`,
     className: '',
     iconSize: [markerW, LOGO_H],
     iconAnchor: [markerW / 2, LOGO_H / 2],

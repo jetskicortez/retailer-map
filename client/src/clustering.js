@@ -57,7 +57,7 @@ export const CLUSTER_CELL = 52;       // px per logo cell inside cluster grid
 export const CLUSTER_GAP = 5;         // px gap between cells
 export const CLUSTER_PAD = 8;         // px padding inside cluster border
 export const MAX_CLUSTER_COLS = 3;    // max columns in cluster grid
-export const MAX_CLUSTER_SIZE = 6;    // max items per cluster (split larger ones)
+export const MAX_CLUSTER_SIZE = 9;    // max items per cluster (split larger ones)
 
 
 // Zoom-adaptive extra padding for merge detection:
@@ -127,7 +127,7 @@ export function buildClusters(map, items) {
   // Merge nodes whose actual positions are close together.
   // For dense areas (16+ items), use a wider proximity threshold to
   // aggressively cluster and reduce connector line clutter.
-  const proximityPad = items.length >= 16 ? pad + 40 : pad;
+  const proximityPad = items.length >= 16 ? pad + 120 : pad;
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
       const ni = nodes[i], nj = nodes[j];
@@ -308,7 +308,7 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
   const propPt = map.latLngToContainerPoint(propertyLatLng);
   const MARGIN_X = 40;  // px from left/right edge
   const MARGIN_Y = 50;  // px from top/bottom edge
-  const GAP_Y = 10;     // vertical gap between logos in a column
+  const MIN_GAP_Y = 18; // minimum vertical gap between logos in a column
 
   // Compute radius ring position in pixels for column placement
   const radiusMeters = (radiusMiles || 1) * 1609.34;
@@ -343,7 +343,7 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
   const usableColH = mapSize.y - 2 * MARGIN_Y;
   function colTotalH(items) {
     if (items.length === 0) return 0;
-    return items.reduce((s, c) => s + c.h, 0) + (items.length - 1) * GAP_Y;
+    return items.reduce((s, c) => s + c.h, 0) + (items.length - 1) * MIN_GAP_Y;
   }
   for (let pass = 0; pass < 20; pass++) {
     const lh = colTotalH(leftItems);
@@ -351,7 +351,7 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
     if (lh <= usableColH && rh <= usableColH) break;
     if (lh > rh && leftItems.length > 1) {
       const last = leftItems[leftItems.length - 1];
-      const newRh = rh + last.h + (rightItems.length > 0 ? GAP_Y : 0);
+      const newRh = rh + last.h + (rightItems.length > 0 ? MIN_GAP_Y : 0);
       // Only move if it genuinely reduces the taller column and the other side can absorb it
       if (newRh <= usableColH || newRh < lh) {
         rightItems.push(leftItems.pop());
@@ -360,7 +360,7 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
     }
     if (rh > lh && rightItems.length > 1) {
       const last = rightItems[rightItems.length - 1];
-      const newLh = lh + last.h + (leftItems.length > 0 ? GAP_Y : 0);
+      const newLh = lh + last.h + (leftItems.length > 0 ? MIN_GAP_Y : 0);
       if (newLh <= usableColH || newLh < rh) {
         leftItems.push(rightItems.pop());
         continue;
@@ -389,17 +389,22 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
   // Layout function: evenly distribute items vertically, aligned to column edge
   function layoutColumn(items, colEdgeX, alignRight) {
     if (items.length === 0) return [];
-    const totalH = items.reduce((sum, c) => sum + c.h, 0) + (items.length - 1) * GAP_Y;
-    // Center the column vertically in the usable area
     const usableTop = MARGIN_Y;
     const usableBottom = mapSize.y - MARGIN_Y;
     const usableH = usableBottom - usableTop;
-    let startY = usableTop + Math.max(0, (usableH - totalH) / 2);
+    const totalItemH = items.reduce((sum, c) => sum + c.h, 0);
+    const packedH = totalItemH + (items.length - 1) * MIN_GAP_Y;
+    let effectiveGap = MIN_GAP_Y;
+    let startY = usableTop + Math.max(0, (usableH - packedH) / 2);
 
-    // If items don't fit, compress the gap
-    let effectiveGap = GAP_Y;
-    if (totalH > usableH) {
-      const totalItemH = items.reduce((sum, c) => sum + c.h, 0);
+    // If there is room, distribute logos evenly through the usable column
+    // instead of packing them as a centered clump. If not, compress the gap.
+    if (items.length === 1) {
+      startY = usableTop + (usableH - items[0].h) / 2;
+    } else if (packedH <= usableH) {
+      effectiveGap = Math.max(MIN_GAP_Y, (usableH - totalItemH) / (items.length + 1));
+      startY = usableTop + effectiveGap;
+    } else {
       effectiveGap = Math.max(2, (usableH - totalItemH) / Math.max(1, items.length - 1));
       startY = usableTop;
     }
@@ -459,7 +464,7 @@ export function displaceClusterRects(map, clusters, propertyLatLng, radiusMiles)
 // Zoom level above which logos snap directly to their actual map position
 // (no column displacement, no connector lines). At this zoom, retailers
 // have enough screen space to sit on their real locations without overlap.
-const SNAP_ZOOM = 15;
+const SNAP_ZOOM = 18;
 
 // ── Step 4: SmartClusterLayer component ──────────────────────────
 export function SmartClusterLayer({ children, onMarkerClick, onClusterClick, markerRefs, propertyLatLng, connectorDataRef, isExportingRef, radiusMiles }) {

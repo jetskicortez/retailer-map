@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Users/Jetsk/Code/retailer-map/.claude/hooks/master-prompt-inject.sh",
+            "timeout": 30,
+            "statusMessage": "Loading operating discipline (code master prompt)"
+          }
+        ]
+      }
+    ]
+  }
+}

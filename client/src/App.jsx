@@ -87,11 +87,16 @@ function MapController({ flyTo, fitBounds }) {
 }
 
 // ── Tile layer URLs ──────────────────────────────────────────────
+// Carto's anonymous basemaps.cartocdn.com tier now serves tiles
+// watermarked "API KEY REQUIRED" (their free anonymous tier was sunset —
+// not a bug here, Carto just requires a paid account now). Swapped
+// "street" to ESRI's free World_Street_Map service, matching the same
+// no-key host already used below for "satellite".
 const TILE_LAYERS = {
   street: {
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, &copy; OpenStreetMap contributors, and the GIS User Community',
+    subdomains: undefined,
   },
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',

@@ -61,7 +61,7 @@ function SurveyTileLayer({ style }) {
     // same host already used for the satellite style below, no key needed.
     const url = style === 'satellite'
       ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-      : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
 
     const attr = style === 'satellite'
       ? 'Tiles &copy; Esri'

@@ -54,13 +54,18 @@ function SurveyTileLayer({ style }) {
   useEffect(() => {
     if (layerRef.current) map.removeLayer(layerRef.current);
 
+    // Carto's anonymous basemaps.cartocdn.com tier now serves tiles
+    // watermarked "API KEY REQUIRED" (their free anonymous tier was
+    // sunset — this isn't a bug in this app, Carto just requires a paid
+    // account now). Swapped to ESRI's free World_Street_Map service —
+    // same host already used for the satellite style below, no key needed.
     const url = style === 'satellite'
       ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
 
     const attr = style === 'satellite'
       ? 'Tiles &copy; Esri'
-      : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>';
+      : 'Tiles &copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, &copy; OpenStreetMap contributors, and the GIS User Community';
 
     layerRef.current = L.tileLayer(url, { attribution: attr, maxZoom: 19 }).addTo(map);
 

@@ -12,6 +12,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { RETAILER_DOMAINS, LOGO_FILES, getLogoUrl, getFallbackLogoUrl, preloadLogo, getLogoMarkerW, createLogoIcon, createTextLogoIcon, LOGO_H, LOGO_MIN_W, LOGO_MAX_W } from './logos.js';
 import { CATEGORIES, getCategoryConfig, MARKER_PAD, SmartClusterLayer } from './clustering.js';
+import { getBrandKey, haversineMiles } from './brands.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
 function escHtml(str) {
@@ -242,24 +243,29 @@ export default function App() {
     });
   }, [data, activeCategories, activeChainSizes]);
 
-  // Deduplicate by chain name: keep the closest location per chain, count the rest
+  // Deduplicate by BRAND (logo identity), not raw name: "GetGo", "GetGo Café + Market" and
+  // "GetGo Gas Station" are one company and must show one logo. The closest location is the
+  // representative; the badge counts distinct sites (records within 0.1 mi of a counted site
+  // are the same physical location — fuel + café + car wash come back as separate places).
   const { dedupedRepresentatives, locationCountMap } = useMemo(() => {
-    const byName = new Map();
-    filteredRetailers.forEach(r => {
-      const key = r.name.toLowerCase().trim();
-      if (!byName.has(key)) {
-        byName.set(key, { rep: r, count: 1 });
-      } else {
-        const entry = byName.get(key);
-        entry.count++;
-        if (r.distance_miles < entry.rep.distance_miles) entry.rep = r;
-      }
-    });
+    const byBrand = new Map();
+    [...filteredRetailers]
+      .sort((a, b) => a.distance_miles - b.distance_miles)
+      .forEach((r) => {
+        const key = getBrandKey(r.name);
+        if (!byBrand.has(key)) {
+          byBrand.set(key, { rep: r, sites: [r] });
+          return;
+        }
+        const entry = byBrand.get(key);
+        const sameSite = entry.sites.some((s) => haversineMiles(s.lat, s.lng, r.lat, r.lng) < 0.1);
+        if (!sameSite) entry.sites.push(r);
+      });
     const representatives = new Set();
     const countMap = new Map();
-    byName.forEach(({ rep, count }) => {
+    byBrand.forEach(({ rep, sites }) => {
       representatives.add(rep);
-      countMap.set(rep, count);
+      countMap.set(rep, sites.length);
     });
     return { dedupedRepresentatives: representatives, locationCountMap: countMap };
   }, [filteredRetailers]);

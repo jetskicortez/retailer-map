@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { getLogoUrl, getFallbackLogoUrl, createLogoIcon, getLogoMarkerW, LOGO_H, LOGO_MIN_W, escapeHtml } from './logos.js';
+import { getBrandKey, collapseSameBrand } from './brands.js';
 
 // ── Category config (shared) ─────────────────────────────────────
 export const CATEGORIES = {
@@ -169,8 +170,10 @@ export function buildClusters(map, items) {
     }
   });
 
-  // Build cluster objects
-  return groups.map((members) => {
+  // Build cluster objects. A cluster box shows one logo per brand — several records of the
+  // same company (name variants, fuel + café + car wash) collapse to one cell.
+  return groups.map((rawMembers) => {
+    const members = collapseSameBrand(rawMembers, (m) => m.brandKey ?? `#${m.idx}`);
     const cx = members.reduce((s, m) => s + m.px, 0) / members.length;
     const cy = members.reduce((s, m) => s + m.py, 0) / members.length;
     const centroidLL = map.containerPointToLatLng([cx, cy]);
@@ -518,6 +521,7 @@ export function SmartClusterLayer({ children, onMarkerClick, onClusterClick, mar
         position: L.latLng(child.position[0], child.position[1]),
         markerW: child.icon?.options?.iconSize?.[0] || LOGO_MIN_W,
         idx: child.idx,
+        brandKey: child.name ? getBrandKey(child.name) : `#${child.idx}`,
       }));
 
       // Step 1: Build clusters
